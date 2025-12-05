@@ -1,0 +1,14 @@
+# Neovim swap files
+*.swp
+*.swo
+
+# Neovim backup files
+*~
+*.bak
+
+# Compiled Lua files (niepotrzebne w repo)
+*.luac
+
+# Lazy.nvim/packer cache (jeśli testujesz plugin lokalnie)
+.git/
+.nvim/
