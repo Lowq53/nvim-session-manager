@@ -17,14 +17,23 @@ User Commands: Provides simple Ex-commands for fast interaction within Neovim.
 
 📦 Installation
 Use your favorite package manager. This example uses Lazy.nvim.
-
+```vim
 Lua
 {
-    'YourGitHubUsername/nvim-session-manager', -- Remember to change this to your actual repository path
+    'Lowq53/nvim-session-manager', -- Remember to change this to your actual repository path
     dependencies = {
         'nvim-lua/plenary.nvim', -- Plenary is often useful for async/filesystem operations
     },
     cmd = { 'Ss', 'Sr' }, -- Load the plugin only when its commands are run
+-- Lazy.nvim
+{
+  "iamcco/markdown-preview.nvim",
+  ft = "markdown",
+  build = "cd app && yarn install",
+  config = function()
+    vim.g.mkdp_filetypes = {"markdown"}
+  end,
+}
     config = function()
         require('session_manager').setup({
             -- Optional: Change the base directory where sessions are stored
@@ -39,6 +48,7 @@ Lua
         { "<leader>rm", ":Sr main<CR>", mode = "n", desc = "Restore Main Session" },
     },
 }
+```
 🚀 Usage
 The plugin registers two global user commands:
 
