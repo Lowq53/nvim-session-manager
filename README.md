@@ -15,65 +15,44 @@ Cross-Platform Paths: Uses Neovim's standard data directory (stdpath("data")) fo
 
 User Commands: Provides simple Ex-commands for fast interaction within Neovim.
 
-<img width="1918" height="1139" alt="image" src="https://github.com/user-attachments/assets/6502dd2c-7a4c-488f-ac9d-ed71cdaa6c11" />
+<img width="1918" height="1139" alt="image" src="https://github.com/user-attachments/assets/2799da50-fde8-47ea-9a13-6f7a673eb82a" />
+
 
 📦 Installation
 Use your favorite package manager. This example uses Lazy.nvim.
-```vim
+```lua
 Lua
 {
-    'Lowq53/nvim-session-manager', -- Remember to change this to your actual repository path
+    'Lowq53/nvim-session-manager',
     dependencies = {
-        'nvim-lua/plenary.nvim', -- Plenary is often useful for async/filesystem operations
+        'nvim-lua/plenary.nvim',
+        'nvim-telescope/telescope.nvim',
     },
-    cmd = { 'Ss', 'Sr' }, -- Load the plugin only when its commands are run
--- Lazy.nvim
-{
-  "iamcco/markdown-preview.nvim",
-  ft = "markdown",
-  build = "cd app && yarn install",
-  config = function()
-    vim.g.mkdp_filetypes = {"markdown"}
-  end,
-}
+    cmd = { 'Ss', 'Sr', 'Sl' },
     config = function()
         require('session_manager').setup({
-            -- Optional: Change the base directory where sessions are stored
-            -- By default, this is ~/.local/share/nvim/sessions (Linux/macOS)
-            -- or C:\Users\User\AppData\Local\nvim\sessions (Windows)
-            base_dir = vim.fn.stdpath("data") .. '/sessions', 
+            -- Automatically resolved to:
+            -- Windows: C:\Users\<User>\AppData\Local\nvim-data\sessions
+            -- Linux:   ~/.local/share/nvim-data/sessions
+            base_dir = vim.fs.normalize(vim.fn.stdpath("data") .. '/sessions'),
         })
     end,
     keys = {
-        -- Example key mappings for quick saving/restoring the 'main' session
-        { "<leader>sm", ":Ss main<CR>", mode = "n", desc = "Save Main Session" },
-        { "<leader>rm", ":Sr main<CR>", mode = "n", desc = "Restore Main Session" },
+        { "<leader>sm", ":Ss main<CR>", desc = "Save Main Session" },
+        { "<leader>rm", ":Sr main<CR>", desc = "Restore Main Session" },
+        { "<leader>sl", ":Sl<CR>", desc = "List Sessions" },
     },
 }
 ```
-🚀 Usage
-The plugin registers two global user commands:
+🚀 Usage Overview
+```lua
+-- Save a session
+:Ss my_session
 
-1. :Ss <name> (Save Session)
-Saves the current workspace state (buffers, layout) and the Shada data (history, registers) to a file named <name>.mks and <name>.shada in the configured base_dir.
+-- Restore a session
+:Sr my_session
 
-Example:
-
-Vim Script
-:Ss project_a
-2. :Sr <name> (Restore Session)
-Loads the session (<name>.mks) and the Shada data (<name>.shada), restoring the previous state of your workspace.
-
-Example:
-
-Vim Script
-:Sr project_a
-⚙️ Configuration (Default Options)
-You can pass a table to the setup function to override defaults:
-
-Lua
-require('session_manager').setup({
-    -- Default location is derived from vim.fn.stdpath("data")
-    base_dir = vim.fn.stdpath("data") .. '/sessions', 
-})
+-- Open Telescope session list
+:Sl
+```
 
