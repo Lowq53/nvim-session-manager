@@ -15,6 +15,8 @@ Cross-Platform Paths: Uses Neovim's standard data directory (stdpath("data")) fo
 
 User Commands: Provides simple Ex-commands for fast interaction within Neovim.
 
+<img width="1918" height="1139" alt="image" src="https://github.com/user-attachments/assets/6502dd2c-7a4c-488f-ac9d-ed71cdaa6c11" />
+
 📦 Installation
 Use your favorite package manager. This example uses Lazy.nvim.
 ```vim
