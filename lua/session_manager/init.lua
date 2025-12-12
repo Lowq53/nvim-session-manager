@@ -1,24 +1,21 @@
--- Komenda do testowania pickera kolorów
---vim.api.nvim_create_user_command('TelescopeColors', function()
----- Wywołanie modułu jest bezpieczne w komendzie, bo Neovim jest już gotowy
---  require("session_manager.telescopeviewer").colors()
---end, { desc = 'Otwiera testowy picker kolorów Telescope' })
-
-
-
+-- Session Manager init.lua
+-- Main module for managing Neovim sessions with shada support
 
 local M = {} -- Main module table
+
 local default_opts = {
   -- Set the default base directory for sessions using the Neovim data path
   -- e.g., ~/.local/share/nvim/sessions or C:\Users\User\AppData\Local\nvim\sessions
-  base_dir = vim.fs.normalize(vim.fn.stdpath("data") .. "/sessions"), --base_dir = 'C:\\Users\\Lowq_53\\AppData\\Local\\nvim-data\\sessions',
+  base_dir = vim.fs.normalize(vim.fn.stdpath("data") .. "/sessions"),
   extra_dirs = {
-    'C:\\code_data\\nvimSessions',                                    -- Poprawnie używasz ukośnika '/' w Lua (jest cross-platform)
-    'C:\\my_old_sessions', },
+    'C:\\code_data\\nvimSessions',
+    'C:\\my_old_sessions',
+  },
 }
+
 -- Helper function: Checks and creates the directory, returns the session path
 local function get_session_path(name)
-  -- Wersja M.save używa tylko katalogu bazowego (zapisu)
+  -- Save version uses only the base directory
   local session_dir = M.options.base_dir
   -- Ensure the base path exists ('p' flag creates parent directories if needed)
   vim.fn.mkdir(session_dir, 'p')
@@ -32,55 +29,54 @@ end
 -- @return table: List of session data {name, path, modified_time, display}
 ---
 function M.get_all_sessions()
-  -- Tabele lokalne, które są czyszczone przy każdym wywołaniu
+  -- Local tables, cleared on each call
   local session_names = {}
-  local sessions_data = {} -- Finalna lista dla Telescope
+  local sessions_data = {} -- Final list for Telescope
 
-  -- Używamy M.search_dirs (lub domyślnych opcji)
+  -- Use M.search_dirs (or default options)
   local search_dirs = M.search_dirs or { M.options.base_dir }
 
   for _, dir in ipairs(search_dirs) do
-    -- KROK 1: Normalizacja ścieżki dla Windowsa
-    -- Używamy formatu, który działa: Podwójne backslashe
+    -- STEP 1: Normalize path for Windows
+    -- Use format that works: Double backslashes
     local win_dir = dir:gsub("/", "\\\\")
-
     local full_path_glob = win_dir .. '\\*.mks'
 
-    -- Pobieramy listę ścieżek do plików sesji
-    -- Użycie vim.fn.glob jest wrażliwe na backslashe, dlatego musimy je zapewnić
+    -- Get list of paths to session files
+    -- Use of vim.fn.glob is sensitive to backslashes, so we must provide them
     local session_files = vim.fn.glob(full_path_glob, 1, 1)
 
-    -- Jeśli nic nie znaleziono, przejdź do następnego katalogu
+    -- If nothing found, continue to next directory
     if vim.tbl_isempty(session_files) then
       goto continue
     end
 
     for _, file_path in ipairs(session_files) do
-      -- 1. Wyodrębnienie nazwy sesji (np. 'main' z '.../main.mks')
-      -- Używamy wzorca, który działa z '/' LUB '\' jako separatorem
+      -- 1. Extract session name (e.g. 'main' from '.../main.mks')
+      -- Use pattern that works with '/' OR '\' as separator
       local file_name = file_path:match("([^/\\\\]+)$")
       local session_name = file_name:gsub('%.mks$', '')
 
-      -- 2. Sprawdzenie duplikatu (ważne, jeśli extra_dirs pokrywają się)
+      -- 2. Check for duplicate (important if extra_dirs overlap)
       if not session_names[session_name] then
         session_names[session_name] = true
 
-        -- 3. Pobieranie daty modyfikacji
+        -- 3. Get modification date
         local timestamp = vim.fn.getftime(file_path)
         local formatted_date = os.date("%Y-%m-%d %H:%M", timestamp)
 
-        -- Pobierz tylko nazwę katalogu dla lepszego wyświetlania
-        -- Szukamy ostatniego segmentu ścieżki (z uwzględnieniem / lub \)
+        -- Get only directory name for better display
+        -- Look for last path segment (considering / or \)
         local dir_name = dir:match("([^/\\\\]+)$") or dir
 
-        -- 4. Dodanie danych do listy wynikowej (Format Telescope)
+        -- 4. Add data to result list (Telescope format)
         table.insert(sessions_data, {
-          name = session_name, -- KLUCZ 1: Używane przez SM.restore(name)
-          path = file_path,    -- KLUCZ 2: Pełna ścieżka do pliku sesji (ordinal)
+          name = session_name, -- KEY 1: Used by SM.restore(name)
+          path = file_path,    -- KEY 2: Full path to session file (ordinal)
           dir = dir,
           modified = formatted_date,
 
-          -- KLUCZ 3: Formatowanie dla widoku w Telescope
+          -- KEY 3: Format for Telescope view
           display = string.format("%-20s %-20s (%s)",
             session_name,
             formatted_date,
@@ -92,7 +88,7 @@ function M.get_all_sessions()
     ::continue::
   end
 
-  -- Gwarancja: Zawsze zwracaj tabelę (sessions_data)
+  -- Guarantee: Always return table (sessions_data)
   return sessions_data
 end
 
@@ -172,6 +168,7 @@ local function save_modified_buffers()
     return true -- Finished iterating, continue restoring
   end
 end
+
 ---
 -- Saves the current session and shada data.
 -- @param name (string) The name of the session file base (e.g., 'main')
@@ -216,6 +213,34 @@ function M.restore(name)
 end
 
 ---
+-- Deletes a session and its associated shada file.
+-- @param session (table) Session data with 'name' and 'path' fields
+---
+function M.delete_session(session)
+  -- Safety check: ensure session is a table
+  if type(session) ~= "table" then
+    print("❌ Error: delete_session expected table, got:", type(session))
+    return
+  end
+
+  local mks = session.path
+  local shada = mks:gsub("%.mks$", ".shada")
+
+  -- Delete .mks file if it exists
+  if vim.fn.filereadable(mks) == 1 then
+    os.remove(mks)
+  end
+
+  -- Delete .shada file if it exists
+  if vim.fn.filereadable(shada) == 1 then
+    os.remove(shada)
+  end
+
+  -- Single line message
+  print("✅ Session deleted: " .. session.name .. " (.mks and .shada)")
+end
+
+---
 -- Main configuration function, called by Lazy.nvim.
 -- @param opts (table|nil) User-provided options
 ---
@@ -226,21 +251,19 @@ function M.setup(opts)
   M.search_dirs = {}
   table.insert(M.search_dirs, M.options.base_dir)
 
-  -- 2. Dodaj wszystkie dodatkowe katalogi z konfiguracji
+  -- 2. Add all additional directories from configuration
   if M.options.extra_dirs and type(M.options.extra_dirs) == 'table' then
     for _, dir in ipairs(M.options.extra_dirs) do
-      -- Upewnij się, że używasz tylko istniejących katalogów (opcjonalnie, ale dobre UX)
+      -- Make sure to use only existing directories (optional, but good UX)
       if vim.fn.isdirectory(dir) == 1 then
         table.insert(M.search_dirs, dir)
       else
-        -- Możesz tu dodać logowanie, jeśli katalog nie istnieje
+        -- You can add logging here if directory doesn't exist
         -- print("Warning: Session search directory not found: " .. dir)
       end
     end
   end
-  -- ********************************************************
-  -- NOWY KROK: WARUNKOWE ZAPISYWANIE BUFORÓW
-  -- ********************************************************
+
   -- Create user commands (for command mode)
 
   -- Command: :Ss <name>
@@ -265,7 +288,7 @@ function M.setup(opts)
 
   -- Command: :Sl (List Sessions)
   vim.api.nvim_create_user_command('Sl', function()
-    -- Wymaganie telescopeviewer następuje dopiero przy wywołaniu tej komendy
+    -- Require telescopeviewer only when this command is called
     require("session_manager.telescopeviewer").sessions()
   end, { desc = 'Session Manager: List and restore sessions using Telescope.' })
 end
