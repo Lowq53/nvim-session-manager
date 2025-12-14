@@ -1,8 +1,9 @@
 -- Session Manager init.lua
 -- Main module for managing Neovim sessions with shada support
 
+-- Sprawdza czy jakiekolwiek floating window jest otwarte
 local M = {} -- Main module table
-
+local utils = require("session_manager.utils")
 local default_opts = {
   -- Set the default base directory for sessions using the Neovim data path
   -- e.g., ~/.local/share/nvim/sessions or C:\Users\User\AppData\Local\nvim\sessions
@@ -190,6 +191,19 @@ end
 -- @param name (string) The name of the session file base (e.g., 'main')
 ---
 function M.restore(name)
+  -- Check if there's a floating window
+  local has_float, win_id = utils.has_floating_windows()
+
+  if has_float then
+    vim.notify("Closing floating window...", vim.log.levels.INFO, { title = "Session Manager" })
+    pcall(vim.api.nvim_win_close, win_id, true)
+
+    -- Wait for closure and call restore again
+    vim.defer_fn(function()
+      M.restore(name)
+    end, 50)
+    return
+  end
   local base_path = get_session_path(name)
   local session_file = base_path .. '.mks'
   local shada_file = base_path .. '.shada'
@@ -199,7 +213,6 @@ function M.restore(name)
     -- Clear the current session buffers before restoring
     -- silent! 1bdelete | only closes all but the first buffer, then leaves only the first buffer
     vim.cmd('silent! 1bdelete | only')
-
     -- 2. Load shada (history/registers). Must be done BEFORE the session file.
     vim.cmd('rshada ' .. shada_file)
 
@@ -207,6 +220,9 @@ function M.restore(name)
     vim.cmd('source ' .. session_file)
 
     print('✅ Session restored from: ' .. session_file)
+    vim.defer_fn(function()
+      vim.cmd('Lazy')
+    end, 100)
   else
     print('❌ Session or shada file not found for: ' .. name)
   end

@@ -54,5 +54,8 @@ Lua
 
 -- Open Telescope session list
 :Sl
+
+Telescopeviewer
+    <C-d> - dedete selected session
 ```
 

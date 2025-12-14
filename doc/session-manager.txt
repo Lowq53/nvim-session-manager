@@ -1,0 +1,226 @@
+*session-manager.txt*  Neovim Session Manager with shada support
+
+==============================================================================
+CONTENTS                                                   *session-manager-contents*
+
+1. Introduction ................... |session-manager-introduction|
+2. Installation .................. |session-manager-installation|
+3. Configuration ................. |session-manager-configuration|
+4. Commands ..................... |session-manager-commands|
+5. Functions ..................... |session-manager-functions|
+6. Usage Examples ................ |session-manager-examples|
+7. Troubleshooting ............... |session-manager-troubleshooting|
+
+==============================================================================
+1. INTRODUCTION                                   *session-manager-introduction*
+
+Session Manager is a Neovim plugin for managing workspace sessions with
+integrated shada (.shada) support. It provides:
+
+- Session saving and restoring with `.mks` and `.shada` files
+- Multiple session directory support
+- Telescope integration for session selection
+- Automatic handling of modified buffers
+- Cross-platform compatibility
+
+==============================================================================
+2. INSTALLATION                                    *session-manager-installation*
+
+Using Lazy.nvim (recommended): >
+  {
+    "Lowq53/session-manager",
+    config = function()
+      require("session_manager").setup({
+        -- Your configuration here
+      })
+    end,
+  }
+<
+
+Using Packer.nvim: >
+  use {
+    "Lowq53/session-manager",
+    config = function()
+      require("session_manager").setup({})
+    end,
+  }
+<
+
+Manual installation:
+1. Clone to your Neovim plugins directory
+2. Add to runtimepath
+3. Run `:helptags doc/` to generate help tags
+
+==============================================================================
+3. CONFIGURATION                                   *session-manager-configuration*
+
+Setup with default options: >
+  require("session_manager").setup()
+<
+
+Setup with custom options: >
+  require("session_manager").setup({
+    base_dir = vim.fn.stdpath("data") .. "/sessions",
+    extra_dirs = {
+      "~/my_sessions",
+      "C:\\projects\\sessions",
+    },
+  })
+<
+
+OPTIONS                                                   *session-manager-options*
+
+base_dir (string)~
+    Default: `vim.fn.stdpath("data") .. "/sessions"`
+    Primary directory for storing session files.
+
+extra_dirs (table)~
+    Default: `{}`
+    Additional directories to search for session files.
+    Example: `{"~/backup_sessions", "C:\\work\\sessions"}`
+
+==============================================================================
+4. COMMANDS                                         *session-manager-commands*
+
+                                                        *:Ss* *:SessionSave*
+:Ss {name}                      Save the current session as {name}
+    Saves both session (.mks) and shada (.shada) files.
+    Example: `:Ss main` creates `main.mks` and `main.shada`
+
+                                                        *:Sr* *:SessionRestore*
+:Sr {name}                      Restore session named {name}
+    Restores both session and shada files.
+    Automatically handles modified buffers before restoring.
+    Example: `:Sr main`
+
+                                                        *:Sl* *:SessionList*
+:Sl                             List all available sessions
+    Opens Telescope picker to browse and select sessions.
+    Supports selection, deletion, and restoration.
+
+==============================================================================
+5. FUNCTIONS                                       *session-manager-functions*
+
+Public API Functions~
+
+session_manager.setup({opts})                       *session_manager.setup()*
+    Initializes the plugin with optional configuration.
+    Called automatically by plugin managers.
+
+session_manager.save({name})                         *session_manager.save()*
+    Saves current session and shada.
+    Usage: `require("session_manager").save("project")`
+
+session_manager.restore({name})                   *session_manager.restore()*
+    Restores session and shada.
+    Usage: `require("session_manager").restore("project")`
+
+session_manager.get_all_sessions()           *session_manager.get_all_sessions()*
+    Returns table of all available sessions.
+    Used by Telescope integration.
+
+session_manager.delete_session({session})     *session_manager.delete_session()*
+    Deletes session and associated shada file.
+    Takes session table as parameter.
+
+==============================================================================
+6. USAGE EXAMPLES                                   *session-manager-examples*
+
+Basic usage: >
+  -- Save current workspace
+  :Ss current_project
+
+  -- Restore saved workspace
+  :Sr current_project
+
+  -- List all sessions with Telescope
+  :Sl
+<
+
+Lua API usage: >
+  local sm = require("session_manager")
+
+  -- Save session programmatically
+  sm.save("my_session")
+
+  -- Get all sessions
+  local sessions = sm.get_all_sessions()
+  for _, session in ipairs(sessions) do
+    print(session.name, session.modified)
+  end
+<
+
+Mapping examples: >
+  -- Normal mode mappings
+  vim.keymap.set("n", "<leader>ss", ":Ss ", { desc = "Save session" })
+  vim.keymap.set("n", "<leader>sr", ":Sr ", { desc = "Restore session" })
+  vim.keymap.set("n", "<leader>sl", ":Sl<CR>", { desc = "List sessions" })
+
+  -- Using Lua functions directly
+  vim.keymap.set("n", "<leader>ws", function()
+    require("session_manager").save(vim.fn.input("Session name: "))
+  end, { desc = "Save session with prompt" })
+<
+
+==============================================================================
+7. TROUBLESHOOTING                               *session-manager-troubleshooting*
+
+PROBLEM: Session not saving properly
+SOLUTION: Check directory permissions and ensure Neovim has write access.
+
+PROBLEM: Shada file not restoring registers/history
+SOLUTION: Verify that `shada` is enabled in Neovim: `:set shada?`
+
+PROBLEM: Modified buffers warning appears unexpectedly
+SOLUTION: The plugin prompts to save modified buffers before restoring.
+          This is intentional to prevent data loss.
+
+PROBLEM: Windows path issues
+SOLUTION: The plugin handles Windows paths automatically.
+          Use forward slashes or double backslashes in configuration.
+
+PROBLEM: Floating windows prevent restore
+SOLUTION: The plugin automatically detects and closes floating windows
+          before restoring sessions.
+
+==============================================================================
+API REFERENCE                                     *session-manager-api-reference*
+
+DATA STRUCTURES~
+
+Session table format: >
+  {
+    name = "session_name",      -- Session identifier
+    path = "/full/path/to/session.mks",
+    dir = "/session/directory",
+    modified = "2024-01-15 14:30",
+    display = "formatted string for Telescope"
+  }
+<
+
+CONFIGURATION TABLE~
+
+Default configuration: >
+  {
+    base_dir = vim.fn.stdpath("data") .. "/sessions",
+    extra_dirs = {}
+  }
+<
+
+==============================================================================
+CHANGELOG                                           *session-manager-changelog*
+
+v1.0.0 (2024-01-15)
+    - Initial release
+    - Basic session save/restore with shada support
+    - Telescope integration
+    - Multiple directory support
+    - Modified buffer handling
+
+==============================================================================
+CREDITS                                             *session-manager-credits*
+Author: Lowq53
+License: MIT
+Repository: https://github.com/Lowq53/session-manager
+
+Inspired by original vim-session plugins and Neovim's native session features.
