@@ -70,7 +70,18 @@ M.sessions = function(opts)
           M.sessions(opts)
         end)
       end
-
+        -- ? → Show help
+  local function show_help()
+    vim.notify([[
+Session Manager - Keybindings:
+  Enter     - Restore session
+  Ctrl+D    - Delete session
+  Esc/q     - Close picker
+  ?         - Show this help\
+]], vim.log.levels.INFO)
+  end
+      map("i", "?", show_help)
+      map("n", "?", show_help)
       map("i", "<C-d>", delete_session)
       map("n", "<C-d>", delete_session)
 
