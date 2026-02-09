@@ -37,11 +37,18 @@ vim.api.nvim_create_user_command("Smgr", function(opts)
         elseif M.current_session then
             session_name = M.current_session
             vim.notify("Zapisuję do aktualnej sesji: " .. session_name, vim.log.levels.INFO)
+              vim.opt.title = true
+          	vim.opt.titlestring = "Nvim: " .. tostring(session_name)
+
         else
             session_name = get_auto_session_name()
+            vim.opt.title = true
+          	vim.opt.titlestring = "Nvim: " .. tostring(session_name)
+
             vim.notify("Brak aktywnej sesji – zapisuję jako: " .. session_name, vim.log.levels.WARN)
         end
         M.save(session_name)
+        M.save_small_marks(session_name)
 
     elseif sub == "load" or sub == "l" or sub == "restore" or sub == "r" then
         if not arg then
@@ -49,6 +56,7 @@ vim.api.nvim_create_user_command("Smgr", function(opts)
             return
         end
         M.restore(arg)
+        M.restore_small_marks(arg)
 
     elseif sub == "delete" or sub == "d" or sub == "del" then
         if not arg then
@@ -81,7 +89,8 @@ end, {
     complete = function(arglead, line)
         local parts = vim.split(line, "%s+")
         if #parts == 2 then
-            return { "save", "load", "delete", "list", "current", "s", "l", "d", "ls", "c", "restore", "r", "del" }
+            return { "save", "load", "delete", "list", "current",
+                     "s", "l", "d", "ls", "c", "restore", "r", "del" }
         end
         return {}
     end,

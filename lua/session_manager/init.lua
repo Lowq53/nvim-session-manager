@@ -1,6 +1,6 @@
 -- Session Manager init.lua
 -- Main module for managing Neovim sessions with shada support
-
+local api = vim.api
 local M = {} -- Main module table
 M.current_session = nil
 
@@ -9,15 +9,24 @@ local default_opts = {
 	-- e.g., ~/.local/share/nvim/sessions or C:\Users\User\AppData\Local\nvim\sessions
 	base_dir = vim.fs.normalize(vim.fn.stdpath("data") .. "/sessions"),
 	extra_dirs = {
-		"C:\\\\nvimSessions",
+		"C:\\code_data\\nvimSessions",
 		"C:\\my_old_sessions",
 		vim.fs.normalize(vim.fn.stdpath("data") .. "/auto-sessions"),
 		vim.fs.normalize(vim.fn.stdpath("data") .. "/persisted"),
 	},
 }
-
+-- Base directory dla sesji (Twój kod)
+M.options = {
+    base_dir = vim.fs.normalize(vim.fn.stdpath("data") .. "/sessions"),
+}
 -- Helper function: Checks and creates the directory, returns the session path
 local function get_session_path(name)
+
+  -- Sprawdź czy 'name' to tablica (obiekt sesji), jeśli tak, wyciągnij pole 'filename' lub 'dir'
+    if type(name) == "table" then
+        -- W zależności od wersji wtyczki, nazwa może być w name.filename lub name.dir
+        name = name.filename or name.dir or tostring(name)
+    end
 	-- Save version uses only the base directory
 	local session_dir = M.options.base_dir
 	-- Ensure the base path exists ('p' flag creates parent directories if needed)
@@ -26,6 +35,66 @@ local function get_session_path(name)
 	-- Return the full base path for the session file (using '/' works cross-platform in Lua/Vim)
 	return session_dir .. "/" .. name
 end
+
+-- Folder na small marks w ramach base_dir
+local marks_dir = M.options.base_dir .. "/marks"
+vim.fn.mkdir(marks_dir, "p")  -- upewnij się, że istnieje
+
+-- Helper: pełna ścieżka pliku small marks dla sessji
+local function get_marks_file(session_name)
+    return get_session_path(session_name) .. ".marks.lua"
+end
+
+---
+-- Zapisuje małe markery (a-z) jako Lua table dla aktualnego bufora
+---
+function M.save_small_marks(session_name)
+    assert(session_name, "session_name required")
+
+    local file = get_marks_file(session_name)
+    local ok, data = pcall(dofile, file)
+    if not ok or type(data) ~= "table" then
+        data = {}
+    end
+
+    local buf = vim.api.nvim_buf_get_name(0)
+    if buf == "" then return end
+
+    local marks = {}
+    for c = string.byte("a"), string.byte("z") do
+        local m = string.char(c)
+        local pos = vim.api.nvim_buf_get_mark(0, m)
+        if pos[1] ~= 0 then
+            marks[m] = pos
+        end
+    end
+
+    data[buf] = marks
+
+    local f = io.open(file, "w")
+    f:write("return " .. vim.inspect(data))
+    f:close()
+end
+
+---
+-- Wczytuje małe markery dla aktualnego bufora
+---
+function M.restore_small_marks(session_name)
+    assert(session_name, "session_name required")
+
+    local file = get_marks_file(session_name)
+    local ok, data = pcall(dofile, file)
+    if not ok or type(data) ~= "table" then return end
+
+    local buf = vim.api.nvim_buf_get_name(0)
+    local marks = data[buf]
+    if not marks then return end
+
+    for k,v in pairs(marks) do
+        vim.api.nvim_buf_set_mark(0, k, v[1], v[2], {})
+    end
+end
+
 -- Zwraca sesje z persisted w formacie kompatybilnym z twoim kodem
 local function get_persisted_sessions()
 	local persisted_dir = vim.fs.normalize(vim.fn.stdpath("data") .. "/persisted")
@@ -177,7 +246,7 @@ local function save_modified_buffers()
 
 	-- 2. Ask the user what to do
 	-- Command: Confirm (save one), All (save all), Abort (cancel restore)
-	local choices = { "&Save", "&All", "&Abort" }
+	local choices = "&Yes\\&No\\&Abort"
 	local choice = vim.fn.confirm(
 		"⚠️ There are " .. #modified_buffers .. " modified buffers. Save before closing?",
 		choices,
@@ -202,9 +271,7 @@ local function save_modified_buffers()
 			vim.api.nvim_set_current_buf(buf_info.bufnr)
 
 			local confirm_save = vim.fn.confirm(
-				"Buffer " .. buf_info.display_name .. " is modified. Save it?",
-				{ "&Yes", "&No", "&Abort" },
-				1
+				"Buffer " .. buf_info.display_name .. " is modified. Save it?", "&Yes\\&No\\&Abort", 1
 			) -- Default is Yes
 
 			if confirm_save == 1 then -- Yes
@@ -246,18 +313,28 @@ function M.save(name)
   M.current_session = name
 	print("✅ Session saved to: " .. session_file)
 end
+---
 
 ---
 -- Restores the session and shada data.
 -- @param name (string) The name of the session file base (e.g., 'main')
 ---
 function M.restore(name)
+  -- Ask user what to do with modified buffers BEFORE restoring session
+if not save_modified_buffers() then
+  return
+end
 	local base_path = get_session_path(name)
 	local session_file = base_path .. ".mks"
 	local shada_file = base_path .. ".shada"
 
 	-- 1. Check if files exist
 	if vim.fn.filereadable(session_file) == 1 and vim.fn.filereadable(shada_file) == 1 then
+	   M.current_session = name
+	  	-- Ustaw tytuł okna
+  	vim.opt.title = true
+  	vim.opt.titlestring = "Nvim: " .. tostring(name)
+
 		-- Clear the current session buffers before restoring
 		-- silent! 1bdelete | only closes all but the first buffer, then leaves only the first buffer
 		vim.cmd("silent! 1bdelete | only")

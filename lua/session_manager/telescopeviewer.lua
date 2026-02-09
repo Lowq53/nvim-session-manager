@@ -52,6 +52,7 @@ M.sessions = function(opts)
         actions.close(prompt_bufnr)
         if entry then
           SM.restore(entry.value)
+          SM.restore_small_marks(arg)
         end
       end)
 
@@ -62,7 +63,7 @@ M.sessions = function(opts)
         local entry = action_state.get_selected_entry()
         if not entry then return end
 
-        actions.close(prompt_bufnr)
+        --actions.close(prompt_bufnr)
         SM.delete_session(entry.data) -- correct full-data delete
 
         -- Refresh picker after delete
@@ -70,6 +71,18 @@ M.sessions = function(opts)
           M.sessions(opts)
         end)
       end
+      local function save_session()
+        local entry = action_state.get_selected_entry()
+          if not entry then return end
+
+         actions.close(prompt_bufnr)
+
+         SM.save_sessio(entry.data)
+         SM.save_small_marks(entry.data)
+         vim.shedule(function()
+            M.sessions(opts)
+         end)
+        end
         -- ? → Show help
   local function show_help()
     vim.notify([[
@@ -84,6 +97,7 @@ Session Manager - Keybindings:
       map("n", "?", show_help)
       map("i", "<C-d>", delete_session)
       map("n", "<C-d>", delete_session)
+      map("n", "<c-s>", save_session)
 
       ----------------------------------------------------------------
       -- Close picker shortcuts
