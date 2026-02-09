@@ -80,17 +80,39 @@ vim.api.nvim_create_user_command("Smgr", function(opts)
     elseif sub == "list" or sub == "ls" then
         require("session_manager.telescopeviewer").sessions()
 
+    elseif sub == "rename" or sub == "rn" then
+        local old_name = arg
+        local new_name = opts.fargs[3]
+        if not old_name or not new_name then
+            vim.notify("Użycie: :Smgr rename <stara_nazwa> <nowa_nazwa>", vim.log.levels.ERROR)
+            return
+        end
+        local success, message = M.rename_session(old_name, new_name)
+        if success then
+            vim.notify("✅ " .. message, vim.log.levels.INFO)
+        else
+            vim.notify("❌ " .. message, vim.log.levels.ERROR)
+        end
+
     else
         vim.notify("Nieznana akcja: " .. sub, vim.log.levels.WARN)
     end
 end, {
     nargs = "*",
-    desc = "Session Manager: save/load/delete/list/current",
+    desc = "Session Manager: save/load/delete/list/current/rename",
     complete = function(arglead, line)
         local parts = vim.split(line, "%s+")
         if #parts == 2 then
-            return { "save", "load", "delete", "list", "current",
-                     "s", "l", "d", "ls", "c", "restore", "r", "del" }
+            return { "save", "load", "delete", "list", "current", "rename",
+                     "s", "l", "d", "ls", "c", "restore", "r", "del", "rn" }
+        elseif #parts == 3 and (parts[2] == "rename" or parts[2] == "rn") then
+            -- For renaming, provide current session names for the old_name argument
+            local sessions = M.get_all_sessions()
+            local session_names = {}
+            for _, sess in ipairs(sessions) do
+                table.insert(session_names, sess.name)
+            end
+            return session_names
         end
         return {}
     end,

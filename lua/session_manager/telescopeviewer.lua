@@ -52,7 +52,7 @@ M.sessions = function(opts)
         actions.close(prompt_bufnr)
         if entry then
           SM.restore(entry.value)
-          SM.restore_small_marks(arg)
+          SM.restore_small_marks(entry.value) -- FIX: changed from arg to entry.value
         end
       end)
 
@@ -63,32 +63,63 @@ M.sessions = function(opts)
         local entry = action_state.get_selected_entry()
         if not entry then return end
 
-        --actions.close(prompt_bufnr)
-        SM.delete_session(entry.data) -- correct full-data delete
+        SM.delete_session(entry.data)
 
         -- Refresh picker after delete
         vim.schedule(function()
           M.sessions(opts)
         end)
       end
+      
+      ----------------------------------------------------------------
+      -- CTRL+S → Save session
+      ----------------------------------------------------------------
       local function save_session()
         local entry = action_state.get_selected_entry()
-          if not entry then return end
+        if not entry then return end
 
-         actions.close(prompt_bufnr)
+        actions.close(prompt_bufnr)
 
-         SM.save_sessio(entry.data)
-         SM.save_small_marks(entry.data)
-         vim.shedule(function()
+        SM.save(entry.value) -- FIX: changed from entry.data to entry.value
+        SM.save_small_marks(entry.value) -- FIX: changed from entry.data to entry.value
+        vim.schedule(function()
             M.sessions(opts)
-         end)
+        end)
+      end
+
+      ----------------------------------------------------------------
+      -- CTRL+R → Rename session
+      ----------------------------------------------------------------
+      local function rename_session_action()
+        local entry = action_state.get_selected_entry()
+        if not entry then return end
+
+        local new_name = vim.fn.input("Enter new session name: ", entry.value)
+        if not new_name or new_name:match("^%s*$") then -- Check for empty or only whitespace
+          vim.notify("❌ Rename cancelled or new name is empty.", vim.log.levels.WARN)
+          return
         end
+
+        local success, message = SM.rename_session(entry.value, new_name)
+        if success then
+          vim.notify("✅ " .. message, vim.log.levels.INFO)
+        else
+          vim.notify("❌ " .. message, vim.log.levels.ERROR)
+        end
+
+        vim.schedule(function()
+          M.sessions(opts) -- Refresh the picker
+        end)
+      end
+
         -- ? → Show help
   local function show_help()
     vim.notify([[
 Session Manager - Keybindings:
   Enter     - Restore session
   Ctrl+D    - Delete session
+  Ctrl+S    - Save session
+  Ctrl+R    - Rename session
   Esc/q     - Close picker
   ?         - Show this help\
 ]], vim.log.levels.INFO)
@@ -97,7 +128,10 @@ Session Manager - Keybindings:
       map("n", "?", show_help)
       map("i", "<C-d>", delete_session)
       map("n", "<C-d>", delete_session)
-      map("n", "<c-s>", save_session)
+      map("i", "<C-s>", save_session) -- Map Ctrl+S in insert mode
+      map("n", "<C-s>", save_session) -- Map Ctrl+S in normal mode
+      map("i", "<C-r>", rename_session_action)
+      map("n", "<C-r>", rename_session_action)
 
       ----------------------------------------------------------------
       -- Close picker shortcuts

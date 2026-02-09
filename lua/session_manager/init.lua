@@ -380,6 +380,64 @@ function M.delete_session(session)
 end
 
 ---
+-- Renames a session and its associated shada and marks files.
+-- @param old_name (string) The current name of the session.
+-- @param new_name (string) The new name for the session.
+-- @return boolean, string: true on success, false and error message on failure.
+---
+function M.rename_session(old_name, new_name)
+    assert(old_name and new_name, "old_name and new_name are required")
+
+    local old_base_path = get_session_path(old_name)
+    local old_mks = old_base_path .. ".mks"
+    local old_shada = old_base_path .. ".shada"
+    local old_marks = get_marks_file(old_name)
+
+    local new_base_path = get_session_path(new_name)
+    local new_mks = new_base_path .. ".mks"
+    local new_shada = new_base_path .. ".shada"
+    local new_marks = get_marks_file(new_name)
+
+    -- 1. Check if old session files exist
+    if vim.fn.filereadable(old_mks) == 0 then
+        return false, "Old session '" .. old_name .. "' not found."
+    end
+
+    -- 2. Check if new session files already exist
+    if vim.fn.filereadable(new_mks) == 1 then
+        return false, "Session '" .. new_name .. "' already exists."
+    end
+
+    -- 3. Perform renames
+    local success = true
+    local error_msg = ""
+
+    local function try_rename(old_path, new_path)
+        if vim.fn.filereadable(old_path) == 1 then
+            local ok, err = os.rename(old_path, new_path)
+            if not ok then
+                success = false
+                error_msg = "Failed to rename " .. old_path .. " to " .. new_path .. ": " .. tostring(err)
+                return false
+            end
+        end
+        return true
+    end
+
+    if not try_rename(old_mks, new_mks) then return false, error_msg end
+    if not try_rename(old_shada, new_shada) then return false, error_msg end
+    if not try_rename(old_marks, new_marks) then return false, error_msg end
+
+    -- 4. Update current_session if the renamed session was active
+    if M.current_session == old_name then
+        M.current_session = new_name
+        vim.opt.titlestring = "Nvim: " .. tostring(new_name)
+    end
+
+    return true, "Session '" .. old_name .. "' renamed to '" .. new_name .. "'."
+end
+
+---
 -- Main configuration function, called by Lazy.nvim.
 -- @param opts (table|nil) User-provided options
 ---
