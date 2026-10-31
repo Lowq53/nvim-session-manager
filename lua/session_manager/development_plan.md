@@ -34,6 +34,7 @@ This document outlines a comprehensive development approach for the `nvim-sessio
 
 Here is a revised, action-oriented roadmap for elevating `nvim-session-manager` to a best-in-class Neovim plugin.
 
+
 ### Phase 1: Foundational Improvements (Code Quality & Testing)
 
 The first priority is to solidify the existing codebase and establish a robust testing framework. This ensures long-term stability and maintainability.
@@ -50,6 +51,7 @@ The first priority is to solidify the existing codebase and establish a robust t
 *   **1.4. Set Up Continuous Integration (CI):**
     *   **Action:** Create a GitHub Actions workflow that automatically runs the linter and the full test suite on every push and pull request.
     *   **Goal:** Automate quality assurance and ensure the `main` branch is always stable.
+*del* *   **1.5. New entry checking 
 
 ### Phase 2: Feature Expansion & User Experience (UX)
 
@@ -107,7 +109,6 @@ The same error occurs in the second `confirm` call:
 ```lua
 -- ❌
 vim.fn.confirm("Buffer ... modified. Save it?", "&Yes\\&No\\&Abort", 1)
-
 -- ✅
 vim.fn.confirm("Buffer ... modified. Save it?", "&Yes\n&No\n&Abort", 1)
 ```
@@ -339,3 +340,400 @@ vim.notify(icon("✅", "[OK]") .. " All saved.", vim.log.levels.INFO)
 *   **Shada + Small Marks Integration:** None of the above do this out-of-the-box.
 *   **`persisted.nvim` Migration Support:** A unique feature.
 *   **Granular Per-Buffer Prompt:** Most only offer `wall` or abort.
+
+Rekomendacja "Senior" (Zastosowanie):
+Jeśli pracujesz w monorepo i zmieniasz branche: Wybierz persisted.nvim. Jego integracja z git-branch jest bezkonkurencyjna.
+Jeśli potrzebujesz pełnej programowalności (Infrastructure as Code): Wybierz resession.nvim. Dzięki zapisowi w Lua możesz napisać logikę, która przy starcie sesji automatycznie konfiguruje środowisko pod konkretne zadanie.
+Jeśli chcesz najwyższego porządku w buforach: Połącz dowolny manager sesji z scope.nvim. To rozwiązuje problem "bałaganu w liście buforów", który jest zmorą przy pracy nad wieloma komponentami jednocześnie.
+Jeśli cenisz analizę danych (Data Science/Research): Wybierz possession.nvim. Przechoowywanie sesji w JSON pozwala na łatwe wersjonowanie ich w Git i współdzielenie z zespołem.
+C:\dev\nvimdev\nvim-session-manager\lua\session_manager\development_plan.md
+Głęboka Analiza Pluginów Sesji Neovim
+Co oznacza "Granular Per-Buffer Prompt"?
+text
+
+┌─────────────────────────────────────────────────────────────────┐
+│  STANDARDOWE PODEJŚCIE (wall or abort):                        │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  "Masz niezapisane zmiany. Zapisać WSZYSTKO? [Y/N]"     │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  GRANULAR PER-BUFFER PROMPT:                                   │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Buffer: init.lua        [Save] [Discard] [Skip]        │   │
+│  │  Buffer: config.lua      [Save] [Discard] [Skip]        │   │
+│  │  Buffer: plugins.lua     [Save] [Discard] [Skip]        │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│  = Decyzja dla KAŻDEGO bufora osobno                           │
+└─────────────────────────────────────────────────────────────────┘
+Analiza Kodu - 3 Unikalne Cechy Każdego Pluginu
+1. auto-session
+Lua
+
+-- UNIKALNA CECHA 1: CWD-based Auto-Detection
+-- Źródło: lua/auto-session/init.lua
+local function get_session_name()
+  -- Automatycznie tworzy nazwę z bieżącego katalogu
+  local cwd = vim.fn.getcwd()
+  return cwd:gsub("/", "%%") -- /home/user/project -> %home%user%project
+end
+
+-- UNIKALNA CECHA 2: Session Lens (Telescope natywna integracja)
+-- Źródło: lua/auto-session/session-lens/init.lua
+require("telescope").load_extension("session-lens")
+-- Można wyszukiwać sesje z preview okien/buforów
+
+-- UNIKALNA CECHA 3: Pre/Post Command Hooks z CWD context
+-- Źródło: lua/auto-session/config.lua
+{
+  pre_save_cmds = { "NvimTreeClose", "TroubleClose" },
+  post_save_cmds = { },
+  pre_restore_cmds = { },
+  post_restore_cmds = { "NvimTreeOpen" }, -- Auto-reopen po restore
+}
+PRO Senior Ocena:
+
+Cecha	Ocena	Powód
+CWD Auto-Detection	⭐⭐⭐⭐⭐	Zero konfiguracji, "just works"
+Session Lens	⭐⭐⭐⭐	Fuzzy search z preview
+Hook System	⭐⭐⭐	Tylko commands, nie full Lua callbacks
+2. persisted.nvim
+Lua
+
+-- UNIKALNA CECHA 1: Git Branch Awareness (automatyczna)
+-- Źródło: lua/persisted/init.lua
+local function get_branch()
+  local branch = vim.fn.system("git branch --show-current 2>/dev/null")
+  if vim.v.shell_error == 0 then
+    return branch:gsub("\n", "")
+  end
+  return nil
+end
+
+-- Sesja: /project@main.vim vs /project@feature-x.vim
+
+-- UNIKALNA CECHA 2: Allowed/Ignored Directories Pattern
+-- Źródło: lua/persisted/config.lua
+{
+  allowed_dirs = { "~/projects" },      -- TYLKO te katalogi
+  ignored_dirs = { "~/projects/temp" }, -- Wyklucz te
+  -- Regex pattern matching!
+  allowed_dirs = { "~/projects/.*" },
+}
+
+-- UNIKALNA CECHA 3: Autoload z warunkami
+-- Źródło: lua/persisted/init.lua
+{
+  autoload = true,
+  on_autoload_no_session = function()
+    -- Callback gdy brak sesji - np. pokaż dashboard
+    vim.cmd("Alpha")
+  end,
+}
+PRO Senior Ocena:
+
+Cecha	Ocena	Powód
+Git Branch Sessions	⭐⭐⭐⭐⭐	Killer feature dla multi-branch work
+Directory Patterns	⭐⭐⭐⭐	Elastyczna kontrola
+Autoload Callbacks	⭐⭐⭐⭐⭐	Pełna integracja z workflow
+3. neovim-session-manager
+Lua
+
+-- UNIKALNA CECHA 1: Autosave Modes (Granularne)
+-- Źródło: lua/session_manager/config.lua
+{
+  autoload_mode = {
+    require('session_manager.config').AutoloadMode.LastSession,
+    require('session_manager.config').AutoloadMode.CurrentDir,
+    require('session_manager.config').AutoloadMode.Disabled,
+  },
+  autosave_last_session = true,
+  autosave_only_in_session = true, -- Nie twórz nowych automatycznie
+}
+
+-- UNIKALNA CECHA 2: Session Events (Autocmd integration)
+-- Źródło: lua/session_manager/init.lua
+vim.api.nvim_create_autocmd("User", {
+  pattern = "SessionLoadPost", -- CUSTOM EVENT!
+  callback = function()
+    -- Po załadowaniu sesji - np. refresh LSP
+    vim.cmd("LspRestart")
+  end,
+})
+-- Dostępne: SessionSavePost, SessionLoadPost, SessionDeletePost
+
+-- UNIKALNA CECHA 3: Session Path Customization
+-- Źródło: lua/session_manager/config.lua
+{
+  sessions_dir = require('plenary.path'):new(
+    vim.fn.stdpath('data'), 'sessions'
+  ),
+  path_replacer = '__', -- /home/user -> home__user
+  colon_replacer = '++',
+}
+PRO Senior Ocena:
+
+Cecha	Ocena	Powód
+Autosave Modes	⭐⭐⭐⭐	Trzy różne tryby
+Custom Events	⭐⭐⭐⭐⭐	Najlepsza integracja z autocmds
+
+
+4. possession.nvim
+Lua
+
+-- UNIKALNA CECHA 1: JSON Metadata (Rozszerzalny format)
+-- Źródło: lua/possession/session.lua
+-- Plik sesji example.json:
+{
+  "name": "my-project",
+  "cwd": "/home/user/project",
+  "user_data": {
+    "git_branch": "main",
+    "last_file": "init.lua",
+    "custom_field": "anything"  -- DOWOLNE DANE!
+  },
+  "vimscript": "...(session content)..."
+}
+
+-- UNIKALNA CECHA 2: Plugin Hooks System (Pre/Post dla wszystkiego)
+-- Źródło: lua/possession/config.lua
+{
+  hooks = {
+    before_save = function(name)
+      -- Return false = cancel save
+      return vim.fn.confirm("Save " .. name .. "?", "&Yes\n&No") == 1
+    end,
+    after_save = function(name, user_data)
+      vim.notify("Saved: " .. name)
+    end,
+    before_load = function(name) return true end,
+    after_load = function(name, user_data) end,
+  },
+}
+
+-- UNIKALNA CECHA 3: Migrate from other plugins
+-- Źródło: lua/possession/migrate.lua
+require('possession').migrate({
+  source = 'auto-session',  -- Importuj z auto-session!
+  -- lub: 'persisted', 'neovim-session-manager'
+})
+PRO Senior Ocena:
+
+Cecha	Ocena	Powód
+JSON + User Data	⭐⭐⭐⭐⭐	Jedyny z metadata extensibility
+Full Hook System	⭐⭐⭐⭐⭐	Lua callbacks dla wszystkiego
+Migration Tool	⭐⭐⭐⭐⭐	UNIKALNY - łatwa migracja
+5. resession.nvim
+Lua
+
+-- UNIKALNA CECHA 1: Lua Tables (Nie Vimscript!)
+-- Źródło: lua/resession/init.lua
+-- Sesja jako pure Lua - PEŁNA KONTROLA
+{
+  buffers = {
+    { file = "/path/to/file.lua", cursor = {10, 5} },
+  },
+  tabs = { ... },
+  options = { ... },
+  -- Custom extension data:
+  extensions = {
+    quickfix = { ... },
+    scope = { ... },  -- Tab-scoped buffers!
+  },
+}
+
+-- UNIKALNA CECHA 2: Extensions API (Pluginy mogą dodawać własne dane)
+-- Źródło: lua/resession/extensions/quickfix.lua
+require("resession").add_extension({
+  name = "quickfix",
+  save = function()
+    return vim.fn.getqflist()
+  end,
+  load = function(data)
+    vim.fn.setqflist(data)
+  end,
+})
+
+-- UNIKALNA CECHA 3: Tab-scoped Sessions
+-- Źródło: lua/resession/init.lua
+require("resession").save_tab("tab-name") -- Zapisz tylko aktualny tab!
+require("resession").load_tab("tab-name")
+PRO Senior Ocena:
+
+Cecha	Ocena	Powód
+Lua Tables	⭐⭐⭐⭐⭐	Programmatic control, no vimscript
+Extensions API	⭐⭐⭐⭐⭐	Najbardziej extensible
+Tab Sessions	⭐⭐⭐⭐⭐	UNIKALNY - per-tab save/restore
+6. mini.sessions
+Lua
+
+-- UNIKALNA CECHA 1: Zero Dependencies (Pure Lua, standalone)
+-- Źródło: lua/mini/sessions.lua
+-- CAŁY PLUGIN TO JEDEN PLIK ~400 linii
+-- Nie wymaga: plenary, telescope, nic
+
+-- UNIKALNA CECHA 2: Detected Sessions (Auto-discovery)
+-- Źródło: lua/mini/sessions.lua
+local sessions = require('mini.sessions')
+sessions.setup({
+  directory = '~/.vim/sessions',
+  autoread = true,
+  autowrite = true,
+})
+-- sessions.detected = { "session1", "session2", ... }
+-- Auto-refresh przy każdej operacji
+
+-- UNIKALNA CECHA 3: Minimal API (3 funkcje)
+sessions.read(session_name)   -- Load
+sessions.write(session_name)  -- Save  
+sessions.delete(session_name) -- Delete
+-- To wszystko! Prostota = mniej bugów
+PRO Senior Ocena:
+
+Cecha	Ocena	Powód
+Zero Deps	⭐⭐⭐⭐⭐	Najbardziej portable
+Auto-Discovery	⭐⭐⭐⭐	Proste ale effective
+Minimal API	⭐⭐⭐⭐⭐	Easy to wrap/extend
+7. scope.nvim
+Lua
+
+-- UNIKALNA CECHA 1: Tab-Scoped Buffer Lists (NIE SESJE!)
+-- Źródło: lua/scope/init.lua
+-- Każdy tab ma WŁASNĄ listę buforów
+-- Tab 1: [file1.lua, file2.lua]
+-- Tab 2: [other.py, main.py]  -- Inne bufory!
+
+-- UNIKALNA CECHA 2: Hooks dla Buffer Lifecycle
+-- Źródło: lua/scope/init.lua
+require("scope").setup({
+  hooks = {
+    post_tab_enter = function()
+      -- Po wejściu do taba - np. refresh statusline
+    end,
+  },
+})
+
+-- UNIKALNA CECHA 3: Telescope/Bufferline Integration
+-- Źródło: lua/telescope/_extensions/scope.lua
+require("telescope").load_extension("scope")
+-- :Telescope scope buffers - bufory TYLKO z current tab
+PRO Senior Ocena:
+
+Cecha	Ocena	Powód
+Tab Buffer Isolation	⭐⭐⭐⭐⭐	UNIKALNY koncept
+Lifecycle Hooks	⭐⭐⭐⭐	Dobra integracja
+Telescope Extension	⭐⭐⭐⭐⭐	Seamless UX
+8. vim-obsession
+Lua
+
+-- UWAGA: To Vimscript plugin, nie Lua
+
+-- UNIKALNA CECHA 1: Continuous Auto-Save (Ciągły zapis)
+-- Źródło: plugin/obsession.vim
+" Po każdej zmianie layoutu - automatyczny zapis
+autocmd BufEnter,VimLeavePre * call s:Persist()
+" NIE trzeba pamiętać o :mksession
+
+-- UNIKALNA CECHA 2: Session Status w Statusline
+" g:obsession_status - zmienna dla statusline
+" Pokazuje czy sesja jest aktywna/paused
+
+-- UNIKALNA CECHA 3: Pause/Resume
+:Obsession       " Toggle
+:Obsession!      " Stop tracking
+:Obsession file  " Zapisz do konkretnego pliku
+PRO Senior Ocena:
+
+Cecha	Ocena	Powód
+Continuous Save	⭐⭐⭐⭐⭐	"Set and forget"
+Statusline Integration	⭐⭐⭐⭐	Visual feedback
+Simplicity	⭐⭐⭐⭐⭐	Najprostrzy ze wszystkich
+9. vim-prosession
+Lua
+
+-- UWAGA: Vimscript, rozszerza vim-obsession
+
+-- UNIKALNA CECHA 1: Per-Directory Auto-Switch
+-- Źródło: plugin/prosession.vim
+" cd ~/project-a -> automatycznie ładuje project-a session
+" cd ~/project-b -> switch to project-b session
+let g:prosession_per_branch = 1
+
+-- UNIKALNA CECHA 2: Tmux Integration
+" Źródło: plugin/prosession.vim
+" Zmienia nazwę panelu tmux na nazwę sesji
+let g:prosession_tmux_title = 1
+
+-- UNIKALNA CECHA 3: Session z obsession + branch + directory
+" Hierarchia: ~/.vim/sessions/home%user%project@@branch.vim
+" Kombinacja trzech kontekstów
+PRO Senior Ocena:
+
+Cecha	Ocena	Powód
+Auto-Switch on CD	⭐⭐⭐⭐⭐	Seamless workflow
+Tmux Integration	⭐⭐⭐⭐	Terminal power users
+Branch+Dir+Obsession	⭐⭐⭐⭐	Kompletne rozwiązanie Vim
+10. vim-startify
+Lua
+
+-- UWAGA: Vimscript
+
+-- UNIKALNA CECHA 1: Start Screen z Sessions
+-- Źródło: autoload/startify.vim
+" Wizualny ekran startowy:
+" [1] Session: project-a
+" [2] Session: project-b
+" [3] Recent: ~/.config/nvim/init.lua
+" [4] Bookmarks: ~/notes/todo.md
+
+-- UNIKALNA CECHA 2: Custom ASCII Art Header
+let g:startify_custom_header = [
+  \ '   ███╗   ██╗██╗   ██╗██╗███╗   ███╗',
+  \ '   ████╗  ██║██║   ██║██║████╗ ████║',
+  \ ]
+
+-- UNIKALNA CECHA 3: Session Persistence + MRU + Bookmarks
+" Wszystko w jednym interfejsie
+let g:startify_lists = [
+  \ { 'type': 'sessions',  'header': ['   Sessions']  },
+  \ { 'type': 'files',     'header': ['   MRU']       },
+  \ { 'type': 'bookmarks', 'header': ['   Bookmarks'] },
+  \ ]
+PRO Senior Ocena:
+
+Cecha	Ocena	Powód
+Visual Start Screen	⭐⭐⭐⭐⭐	UX excellence
+Custom Headers	⭐⭐⭐⭐	Personalizacja
+All-in-One UI	⭐⭐⭐⭐⭐	Sessions + MRU + Bookmarks
+Matryca Porównawcza - Unikalne Cechy
+text
+
+┌─────────────────────┬─────────────────┬──────────────────┬─────────────────┐
+│ Plugin              │ Cecha 1         │ Cecha 2          │ Cecha 3         │
+├─────────────────────┼─────────────────┼──────────────────┼─────────────────┤
+│ auto-session        │ CWD Auto-Name   │ Session Lens     │ Command Hooks   │
+│ persisted.nvim      │ Git Branch      │ Dir Patterns     │ Autoload CB     │
+│ neovim-session-mgr  │ Autosave Modes  │ Custom Events    │ Path Custom     │
+│ possession.nvim     │ JSON Metadata   │ Full Hooks       │ Migration       │
+│ resession.nvim      │ Lua Tables      │ Extensions API   │ Tab Sessions    │
+│ mini.sessions       │ Zero Deps       │ Auto-Discovery   │ Minimal API     │
+│ scope.nvim          │ Tab Buffers     │ Lifecycle Hooks  │ Telescope Ext   │
+│ vim-obsession       │ Continuous Save │ Statusline       │ Pause/Resume    │
+│ vim-prosession      │ Auto-Switch CD  │ Tmux Title       │ Branch+Dir      │
+│ vim-startify        │ Start Screen    │ ASCII Art        │ All-in-One UI   │
+└─────────────────────┴─────────────────┴──────────────────┴─────────────────┘
+Rekomendacja PRO Senior
+text
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│  USE CASE → PLUGIN                                                       │
+├──────────────────────────────────────────────────────────────────────────┤
+│  "Just works, zero config"     → auto-session                            │
+│  "Git branch workflows"        → persisted.nvim                          │
+│  "Maximum extensibility"       → resession.nvim + scope.nvim             │
+│  "Migrate from other plugin"   → possession.nvim                         │
+│  "Minimalist, no deps"         → mini.sessions                           │
+│  "Classic Vim, simple"         → vim-obsession                           │
+│  "Visual start screen"         → vim-startify                            │
+│  "Tab-based workflows"         → resession.nvim (tab sessions)           │
+└──────────────────────────────────────────────────────────────────────────┘
+Czy chcesz żebym przeanalizował konkretny aspekt kodu głębiej?

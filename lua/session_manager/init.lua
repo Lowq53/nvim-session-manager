@@ -1,4 +1,8 @@
 -- Session Manager init.lua
+-- 
+--
+-- *del*
+--new entry
 -- Main module for managing Neovim sessions with shada support
 local api = vim.api
 local M = {} -- Main module table
@@ -220,7 +224,6 @@ end
 ---
 local function save_modified_buffers()
 	local modified_buffers = {}
-
 	-- 1. Find all modified buffers that are listed (ls)
 	for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
 		if vim.api.nvim_get_option_value("modified", { buf = buffer }) then
@@ -228,7 +231,6 @@ local function save_modified_buffers()
 			local bufnr = buffer
 			local fname = vim.api.nvim_buf_get_name(bufnr)
 			local display_name = fname ~= "" and fname or "No Name"
-
 			-- Only consider buffers that are readable and listed
 			if vim.fn.buflisted(bufnr) == 1 and vim.fn.bufloaded(bufnr) == 1 then
 				table.insert(modified_buffers, {
@@ -239,54 +241,46 @@ local function save_modified_buffers()
 			end
 		end
 	end
-
 	if #modified_buffers == 0 then
 		return true -- All clean, continue restoring session
 	end
-
 	-- 2. Ask the user what to do
-	-- Command: Confirm (save one), All (save all), Abort (cancel restore)
-	local choices = "&Yes\\&No\\&Abort"
+	-- 1=Yes(save all), 2=No(discard all), 3=Abort
+	local choices = "&Yes\n&No\n&Abort"  -- FIX: \n separator, not \\
 	local choice = vim.fn.confirm(
 		"⚠️ There are " .. #modified_buffers .. " modified buffers. Save before closing?",
 		choices,
-		2
-	) -- Default is All
-
-	if choice == 3 then
+		1  -- FIX: default = Yes
+	)
+	if choice == 3 or choice == 0 then  -- FIX: 3=Abort, 0=Esc
 		print("❌ Session restore aborted.")
 		return false -- Abort restore
-	elseif choice == 2 then
+	elseif choice == 1 then  -- FIX: 1=Yes (było 2)
 		-- Choice: Save All
-		for _, buf_info in ipairs(modified_buffers) do
-			-- Use 'silent! wall' to save all modified, then return
-			vim.cmd("silent! wall")
-			print("✅ All modified buffers saved.")
-			return true
-		end
-	else
-		-- Choice: Save (Iterate and confirm one by one)
+		vim.cmd("silent! wall")  -- FIX: poza pętlą, wall zapisuje wszystkie
+		print("✅ All modified buffers saved.")
+		return true
+	else  -- choice == 2 = No
+		-- Choice: No - iterate and confirm one by one
 		for _, buf_info in ipairs(modified_buffers) do
 			-- Switch to the buffer to show it to the user
 			vim.api.nvim_set_current_buf(buf_info.bufnr)
-
 			local confirm_save = vim.fn.confirm(
-				"Buffer " .. buf_info.display_name .. " is modified. Save it?", "&Yes\\&No\\&Abort", 1
+				"Buffer " .. buf_info.display_name .. " is modified. Save it?",
+				"&Yes\n&No\n&Abort",  -- FIX: \n separator
+				1
 			) -- Default is Yes
-
 			if confirm_save == 1 then -- Yes
 				if buf_info.fname == "" then
 					-- If 'No Name', ask user to choose a path
-					print(
-						"⚠️ Buffer has no file name. Please save it manually (e.g. :w /path/to/file) or choose No."
-					)
+					print("⚠️ Buffer has no file name. Please save it manually (e.g. :w /path/to/file) or choose No.")
 					vim.fn.input("Press ENTER to continue...")
 					return false -- Force user to save manually
 				else
 					vim.cmd("silent! w " .. buf_info.fname)
 					print("✅ Saved: " .. buf_info.display_name)
 				end
-			elseif confirm_save == 3 then -- Abort
+			elseif confirm_save == 3 or confirm_save == 0 then -- Abort/Esc
 				print("❌ Session restore aborted.")
 				return false
 			end
@@ -295,7 +289,6 @@ local function save_modified_buffers()
 		return true -- Finished iterating, continue restoring
 	end
 end
-
 ---
 -- Saves the current session and shada data.
 -- @param name (string) The name of the session file base (e.g., 'main')

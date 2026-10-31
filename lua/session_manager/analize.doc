@@ -1,0 +1,19 @@
+# ideas
+▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰
+0. scraches -
+0. a - quick sav saession pod alt f5 ? sprawdzic co robi
+1. podaj mi wszystkie od jabardiej populernych sesion managerów pluginy dla nvima i vim
+2. zrob mi liste funkcjionalności must hve dla takiego narzedzia
+3. zrob porjek rozwoju tego pluginu i stukture projektu
+4. zeczy tkóre powninieem si dowiediec o nivmie na podstawie tego projektu 
+5. zaproponuj 5 kolejnych unków ideas 
+6. poprawic komendy w help kiedy okno listy sessi jest otwarte
+
+#
+#▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰
+a. wyswietlanie helpa w 3 wersjach notify previev,flowating window
+# answers
+# Tryb "preview" — previewer pokazuje info o sesji normalnie, po ? przełącza na help. Telescope nie ma wbudowanego "close preview" API, więc toggle to jedyne czyste rozwiązanie.
+  Tryb "float" — zindex = 200 żeby był nad Telescope. Zamknięcie: q, Esc wewnątrz floata, lub drugi ?.
+  Reset stanu — przy każdym M.sessions() wszystkie flagi są czyszczone — nie zostają "wiszące" po poprzedniej sesji pickera.
+▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰
