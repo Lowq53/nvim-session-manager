@@ -20,6 +20,7 @@ local HELP_LINES = {
   "├──────────────────────────────────────┤",
   "│  Enter    │ Restore session          │",
   "│  Ctrl+S   │ Save session             │",
+  "│  Ctrl+Shift+S │ Save as new session  │",
   "│  Ctrl+D   │ Delete session           │",
   "│  Ctrl+R   │ Rename session           │",
   "│  ?        │ Toggle this help         │",
@@ -233,6 +234,32 @@ M.sessions = function(opts)
         vim.schedule(function() M.sessions(opts) end)
       end
 
+      -- CTRL+SHIFT+S → Save the current workspace as a new session
+      local function save_new_session()
+        local new_name = vim.fn.input("New session name: ")
+        if not new_name or new_name:match("^%s*$") then
+          vim.notify("❌ Save cancelled or empty name.", vim.log.levels.WARN)
+          return
+        end
+        if not new_name:match("^[%w_%-]+$") then
+          vim.notify("❌ Use only letters, numbers, underscores, and hyphens in session names.", vim.log.levels.ERROR)
+          return
+        end
+        for _, session in ipairs(SM.get_all_sessions()) do
+          if session.name == new_name then
+            vim.notify("❌ Session '" .. new_name .. "' already exists.", vim.log.levels.ERROR)
+            return
+          end
+        end
+
+        help_float_close()
+        actions.close(prompt_bufnr)
+        SM.save(new_name)
+        SM.save_small_marks(new_name)
+        vim.notify("✅ New session saved: " .. new_name, vim.log.levels.INFO)
+        vim.schedule(function() M.sessions(opts) end)
+      end
+
       -- CTRL+R → Rename session
       local function rename_session_action()
         local entry = action_state.get_selected_entry()
@@ -271,6 +298,8 @@ M.sessions = function(opts)
       map("n", "<C-d>", delete_session)
       map("i", "<C-s>", save_session)
       map("n", "<C-s>", save_session)
+      map("i", "<C-S-s>", save_new_session)
+      map("n", "<C-S-s>", save_new_session)
       map("i", "<C-r>", rename_session_action)
       map("n", "<C-r>", rename_session_action)
       map("i", "<Esc>", close_all)
