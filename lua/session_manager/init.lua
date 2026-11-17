@@ -162,65 +162,49 @@ end
 -- Retrieves a list of all available sessions across all search directories.
 -- @return table: List of session data {name, path, modified_time, display}
 ---
+---@return table[] sessions_data lista { name, path, dir, modified, display } dla Telescope
 function M.get_all_sessions()
-	-- Local tables, cleared on each call
 	local session_names = {}
-	local sessions_data = {} -- Final list for Telescope
+	local sessions_data = {}
 
-	-- Use M.search_dirs (or default options)
 	local search_dirs = M.search_dirs or { M.options.base_dir }
 
 	for _, dir in ipairs(search_dirs) do
-		-- STEP 1: Normalize path for Windows
-		-- Use format that works: Double backslashes
-		local win_dir = dir:gsub("/", "\\\\")
-		local full_path_glob = win_dir .. "\\*.mks"
+		-- STEP 1: normalize path (cross-platform): expand ~ / env vars, backslash -> slash, bez konczacego "/"
+		local norm_dir = vim.fn.expand(dir):gsub("\\", "/"):gsub("/+$", "")
+		local full_path_glob = norm_dir .. "/*.mks"
 
-		-- Get list of paths to session files
-		-- Use of vim.fn.glob is sensitive to backslashes, so we must provide them
-		local session_files = vim.fn.glob(full_path_glob, 1, 1)
+		local session_files = vim.fn.glob(full_path_glob, true, true)
 
-		-- If nothing found, continue to next directory
 		if vim.tbl_isempty(session_files) then
 			goto continue
 		end
 
 		for _, file_path in ipairs(session_files) do
-			-- 1. Extract session name (e.g. 'main' from '.../main.mks')
-			-- Use pattern that works with '/' OR '\' as separator
-			local file_name = file_path:match("([^/\\\\]+)$")
+			local file_name = file_path:match("([^/\\]+)$")
 			local session_name = file_name:gsub("%.mks$", "")
 
-			-- 2. Check for duplicate (important if extra_dirs overlap)
 			if not session_names[session_name] then
 				session_names[session_name] = true
 
-				-- 3. Get modification date
 				local timestamp = vim.fn.getftime(file_path)
 				local formatted_date = os.date("%Y-%m-%d %H:%M", timestamp)
+				local dir_name = norm_dir:match("([^/]+)$") or dir
 
-				-- Get only directory name for better display
-				-- Look for last path segment (considering / or \)
-				local dir_name = dir:match("([^/\\\\]+)$") or dir
-
-				-- 4. Add data to result list (Telescope format)
 				table.insert(sessions_data, {
-					name = session_name, -- KEY 1: Used by SM.restore(name)
-					path = file_path, -- KEY 2: Full path to session file (ordinal)
+					name = session_name,
+					path = file_path,
 					dir = dir,
 					modified = formatted_date,
-
-					-- KEY 3: Format for Telescope view
 					display = string.format("%-20s %-20s (%s)", session_name, formatted_date, dir_name),
 				})
 			end
 		end
 		::continue::
 	end
-	-- dodasz dosctring dla funkcji ponizej i getpersisted_sessions
-	-- STEP 2: Add sessions from persisted.nvim
+
+	-- STEP 2: sesje z persisted.nvim
 	vim.list_extend(sessions_data, get_persisted_sessions())
-	-- Guarantee: Always return table (sessions_data)
 	return sessions_data
 end
 
