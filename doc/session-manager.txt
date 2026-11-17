@@ -1,0 +1,202 @@
+*session-manager.txt*  Neovim Session Manager with shada and marks support
+
+==============================================================================
+CONTENTS                                                   *session-manager-contents*
+
+1. Introduction ................... |session-manager-introduction|
+2. Installation .................. |session-manager-installation|
+3. Configuration ................. |session-manager-configuration|
+4. Commands ..................... |session-manager-commands|
+5. Telescope Keymaps ............. |session-manager-telescope|
+6. Functions ..................... |session-manager-functions|
+7. Usage Examples ................ |session-manager-examples|
+8. Troubleshooting ............... |session-manager-troubleshooting|
+
+==============================================================================
+1. INTRODUCTION                                   *session-manager-introduction*
+
+Session Manager is a cross-platform Neovim plugin (Linux, WSL, macOS, Windows)
+for managing workspace sessions with integrated ShaDa and buffer marks support.
+It provides:
+
+- Session saving and restoring with `.mks` and `.shada` files
+- Buffer small marks persistence (`a-z`) saved across all loaded buffers
+- Multiple session directory search support
+- Seamless `persisted.nvim` session discovery and restoration
+- Telescope integration with interactive shortcuts and help viewer
+- Automatic handling of modified buffers before restoring
+- Strict file permission handling on Linux/macOS (`0600`)
+
+==============================================================================
+2. INSTALLATION                                    *session-manager-installation*
+
+Using Lazy.nvim (recommended): >
+  {
+    "Lowq53/session-manager",
+    dependencies = { "nvim-telescope/telescope.nvim" },
+    config = function()
+      require("session_manager").setup({
+        -- Your configuration here
+      })
+    end,
+  }
+<
+
+Using Packer.nvim: >
+  use {
+    "Lowq53/session-manager",
+    requires = { "nvim-telescope/telescope.nvim" },
+    config = function()
+      require("session_manager").setup({})
+    end,
+  }
+<
+
+==============================================================================
+3. CONFIGURATION                                   *session-manager-configuration*
+
+Setup with default options: >
+  require("session_manager").setup()
+<
+
+Setup with custom options: >
+  require("session_manager").setup({
+    base_dir = vim.fn.stdpath("data") .. "/sessions",
+    extra_dirs = {
+      "~/my_sessions",
+      vim.fn.stdpath("data") .. "/auto-sessions",
+      vim.fn.stdpath("data") .. "/persisted",
+    },
+    help_mode = "notify", -- "notify" | "float" | "preview"
+  })
+<
+
+OPTIONS                                                   *session-manager-options*
+
+base_dir (string)~
+    Default: `vim.fn.stdpath("data") .. "/sessions"`
+    Primary directory for storing session files (`.mks`, `.shada`, and marks).
+
+extra_dirs (table)~
+    Default: `{ ... }`
+    Additional directories to search for session files.
+
+help_mode (string)~
+    Default: `"notify"`
+    Help display style in Telescope picker: `"notify"`, `"float"`, or `"preview"`.
+
+==============================================================================
+4. COMMANDS                                         *session-manager-commands*
+
+                                                        *:Smgr*
+:Smgr {action} [args]
+    Unified session management command. Supported subcommands:
+    - `save` [name] (or `s`): Save current session and marks.
+    - `load` <name> (or `l`, `restore`, `r`): Restore session, shada and marks.
+    - `delete` <name> (or `d`, `del`): Delete session, shada and marks.
+    - `list` (or `ls`): Open interactive Telescope session picker.
+    - `current` (or `c`): Display the name of the currently active session.
+    - `rename` <old> <new> (or `rn`): Rename session, shada and marks files.
+
+                                                        *:Ss* *:SessionSave*
+:Ss [name]                      Save the current session as [name]
+    Saves session (.mks), shada (.shada) and marks (.marks.json).
+    If [name] is omitted, uses the current session or directory name.
+
+                                                        *:Sr* *:SessionRestore*
+:Sr <name>                      Restore session named <name>
+    Restores session, shada, and buffer small marks.
+    Prompts to handle modified buffers cleanly before restoring.
+
+                                                        *:Sl* *:SessionList*
+:Sl                             List all available sessions
+    Opens Telescope picker to browse, search, and manage sessions.
+
+==============================================================================
+5. TELESCOPE KEYMAPS                               *session-manager-telescope*
+
+When inside the `:Sl` or `:Smgr list` Telescope picker:
+
+Key             Action
+----------------------------------------------------------------------
+<CR>            Restore selected session
+<C-s>           Overwrite selected session with current workspace
+<C-S-s>         Save current workspace as a new session (prompts for name)
+<C-d>           Delete selected session (with confirmation)
+<C-r>           Rename selected session
+?               Toggle help view (according to configured `help_mode`)
+<Esc> / q       Close session picker and any active help window
+
+==============================================================================
+6. FUNCTIONS                                       *session-manager-functions*
+
+Public API Functions~
+
+session_manager.setup({opts})                       *session_manager.setup()*
+    Initializes the plugin with optional configuration.
+
+session_manager.save({name})                         *session_manager.save()*
+    Saves session and shada for {name}.
+
+session_manager.restore({session_or_name})           *session_manager.restore()*
+    Restores session, shada, and marks. Accepts string name or session table.
+
+session_manager.save_small_marks({name})             *session_manager.save_small_marks()*
+    Saves small marks (a-z) for all active buffers in JSON format.
+
+session_manager.restore_small_marks({name})          *session_manager.restore_small_marks()*
+    Restores small marks for all matching buffers.
+
+session_manager.delete_session({session})            *session_manager.delete_session()*
+    Deletes session (.mks), shada (.shada), and marks files.
+
+session_manager.rename_session({old}, {new})         *session_manager.rename_session()*
+    Renames session, shada, and marks files.
+
+session_manager.get_all_sessions()                   *session_manager.get_all_sessions()*
+    Returns table of all available sessions across configured search dirs.
+
+==============================================================================
+7. USAGE EXAMPLES                                   *session-manager-examples*
+
+Basic usage: >
+  -- Save workspace
+  :Smgr save my_feature
+  -- or
+  :Ss my_feature
+
+  -- Restore workspace
+  :Smgr load my_feature
+  -- or
+  :Sr my_feature
+
+  -- List sessions in Telescope
+  :Sl
+<
+
+Keymap configurations: >
+  vim.keymap.set("n", "<leader>ss", ":Ss<CR>", { desc = "Save session" })
+  vim.keymap.set("n", "<leader>sr", ":Sr ", { desc = "Restore session" })
+  vim.keymap.set("n", "<leader>sl", ":Sl<CR>", { desc = "List sessions" })
+<
+
+==============================================================================
+8. TROUBLESHOOTING                               *session-manager-troubleshooting*
+
+PROBLEM: Linux path issues or empty session list
+SOLUTION: The plugin uses standard forward slashes and `vim.fs`/`vim.fn.stdpath`.
+          Ensure session directory permissions are valid.
+
+PROBLEM: Shada file permissions on Linux
+SOLUTION: On non-Windows platforms, ShaDa files are created with mode `0600`
+          to secure sensitive command history and register data.
+
+PROBLEM: Floating windows prevent clean restore
+SOLUTION: The plugin automatically detects and closes floating windows
+          before restoring sessions.
+
+==============================================================================
+CREDITS                                             *session-manager-credits*
+Author: Lowq53
+License: MIT
+Repository: https://github.com/Lowq53/session-manager

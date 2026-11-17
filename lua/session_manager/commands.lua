@@ -1,119 +1,155 @@
 -- lua/session_manager/commands.lua
-local M = require("session_manager")
+-- Definicja komend Neovim: :Smgr oraz aliasów :Ss, :Sr, :Sl
+local SM = require("session_manager")
+local utils = require("session_manager.utils")
 
--- Helper: auto session name
 local function get_auto_session_name()
-    local cwd = vim.fn.getcwd()
-    return vim.fn.fnamemodify(cwd, ":t")
+	local cwd = vim.fn.getcwd()
+	return vim.fn.fnamemodify(cwd, ":t")
 end
 
--- Helper: find session by name
 local function find_session_by_name(name)
-    local sessions = M.get_all_sessions()
-    for _, sess in ipairs(sessions) do
-        if sess.name == name then
-            return sess
-        end
-    end
-    return nil
+	for _, sess in ipairs(SM.get_all_sessions()) do
+		if sess.name == name then
+			return sess
+		end
+	end
+	return nil
 end
 
--- Main command: :Smgr
+-- ====================================================================
+-- Główna komenda: :Smgr {save|load|delete|list|current|rename}
+-- ====================================================================
 vim.api.nvim_create_user_command("Smgr", function(opts)
-    local sub = opts.fargs[1]
-    local arg = opts.fargs[2]
+	local sub = opts.fargs[1]
+	local arg = opts.fargs[2]
 
-    if not sub then
-        vim.notify("Użycie: :Smgr {save|load|delete|list|current} [nazwa]", vim.log.levels.WARN)
-        return
-    end
+	if not sub then
+		vim.notify("Użycie: :Smgr {save|load|delete|list|current|rename} [nazwa]", vim.log.levels.WARN)
+		return
+	end
 
-    sub = sub:lower()
+	sub = sub:lower()
 
-    if sub == "save" or sub == "s" then
-        local session_name
-        if arg then
-            session_name = arg
-        elseif M.current_session then
-            session_name = M.current_session
-            vim.notify("Zapisuję do aktualnej sesji: " .. session_name, vim.log.levels.INFO)
-              vim.opt.title = true
-          	vim.opt.titlestring = "Nvim: " .. tostring(session_name)
+	if sub == "save" or sub == "s" then
+		local session_name = arg or SM.current_session or get_auto_session_name()
+		SM.save(session_name)
+		SM.save_small_marks(session_name)
 
-        else
-            session_name = get_auto_session_name()
-            vim.opt.title = true
-          	vim.opt.titlestring = "Nvim: " .. tostring(session_name)
+	elseif sub == "load" or sub == "l" or sub == "restore" or sub == "r" then
+		if not arg then
+			vim.notify("Podaj nazwę sesji: :Smgr load <nazwa>", vim.log.levels.ERROR)
+			return
+		end
+		local session = find_session_by_name(arg)
+		if session then
+			SM.restore(session)
+		else
+			SM.restore(arg)
+		end
 
-            vim.notify("Brak aktywnej sesji – zapisuję jako: " .. session_name, vim.log.levels.WARN)
-        end
-        M.save(session_name)
-        M.save_small_marks(session_name)
+	elseif sub == "delete" or sub == "d" or sub == "del" then
+		if not arg then
+			vim.notify("Podaj nazwę sesji: :Smgr delete <nazwa>", vim.log.levels.ERROR)
+			return
+		end
+		local session = find_session_by_name(arg)
+		if session then
+			SM.delete_session(session)
+		else
+			SM.delete_session(arg)
+		end
 
-    elseif sub == "load" or sub == "l" or sub == "restore" or sub == "r" then
-        if not arg then
-            vim.notify("Podaj nazwę: :Smgr load <nazwa>", vim.log.levels.ERROR)
-            return
-        end
-        M.restore(arg)
-        M.restore_small_marks(arg)
+	elseif sub == "current" or sub == "c" then
+		if SM.current_session then
+			vim.notify("Aktualna sesja: " .. SM.current_session, vim.log.levels.INFO)
+		else
+			vim.notify("Brak aktywnej sesji", vim.log.levels.WARN)
+		end
 
-    elseif sub == "delete" or sub == "d" or sub == "del" then
-        if not arg then
-            vim.notify("Podaj nazwę: :Smgr delete <nazwa>", vim.log.levels.ERROR)
-            return
-        end
-        local session = find_session_by_name(arg)
-        if session then
-            M.delete_session(session)
-        else
-            vim.notify("Sesja nie znaleziona: " .. arg, vim.log.levels.ERROR)
-        end
+	elseif sub == "list" or sub == "ls" then
+		require("session_manager.telescopeviewer").sessions()
 
-    elseif sub == "current" or sub == "c" then
-        if M.current_session then
-            vim.notify("Aktualna sesja: " .. M.current_session, vim.log.levels.INFO)
-        else
-            vim.notify("Brak aktywnej sesji", vim.log.levels.WARN)
-        end
+	elseif sub == "rename" or sub == "rn" then
+		local old_name = arg
+		local new_name = opts.fargs[3]
+		if not old_name or not new_name then
+			vim.notify("Użycie: :Smgr rename <stara_nazwa> <nowa_nazwa>", vim.log.levels.ERROR)
+			return
+		end
+		local ok, msg = SM.rename_session(old_name, new_name)
+		vim.notify((ok and "✅ " or "❌ ") .. msg, ok and vim.log.levels.INFO or vim.log.levels.ERROR)
 
-    elseif sub == "list" or sub == "ls" then
-        require("session_manager.telescopeviewer").sessions()
-
-    elseif sub == "rename" or sub == "rn" then
-        local old_name = arg
-        local new_name = opts.fargs[3]
-        if not old_name or not new_name then
-            vim.notify("Użycie: :Smgr rename <stara_nazwa> <nowa_nazwa>", vim.log.levels.ERROR)
-            return
-        end
-        local success, message = M.rename_session(old_name, new_name)
-        if success then
-            vim.notify("✅ " .. message, vim.log.levels.INFO)
-        else
-            vim.notify("❌ " .. message, vim.log.levels.ERROR)
-        end
-
-    else
-        vim.notify("Nieznana akcja: " .. sub, vim.log.levels.WARN)
-    end
+	else
+		vim.notify("Nieznana akcja: " .. sub, vim.log.levels.WARN)
+	end
 end, {
-    nargs = "*",
-    desc = "Session Manager: save/load/delete/list/current/rename",
-    complete = function(arglead, line)
-        local parts = vim.split(line, "%s+")
-        if #parts == 2 then
-            return { "save", "load", "delete", "list", "current", "rename",
-                     "s", "l", "d", "ls", "c", "restore", "r", "del", "rn" }
-        elseif #parts == 3 and (parts[2] == "rename" or parts[2] == "rn") then
-            -- For renaming, provide current session names for the old_name argument
-            local sessions = M.get_all_sessions()
-            local session_names = {}
-            for _, sess in ipairs(sessions) do
-                table.insert(session_names, sess.name)
-            end
-            return session_names
-        end
-        return {}
-    end,
+	nargs = "*",
+	desc = "Session Manager: save, load, delete, list, current, rename",
+	complete = function(_, line)
+		local parts = vim.split(line, "%s+")
+		if #parts == 2 then
+			return { "save", "load", "delete", "list", "current", "rename", "s", "l", "d", "ls", "c", "r", "rn", "del" }
+		elseif #parts == 3 then
+			local subcmd = parts[2]:lower()
+			if
+				subcmd == "load"
+				or subcmd == "l"
+				or subcmd == "restore"
+				or subcmd == "r"
+				or subcmd == "delete"
+				or subcmd == "d"
+				or subcmd == "del"
+				or subcmd == "rename"
+				or subcmd == "rn"
+			then
+				local names = {}
+				for _, s in ipairs(SM.get_all_sessions()) do
+					table.insert(names, s.name)
+				end
+				return names
+			end
+		end
+		return {}
+	end,
 })
+
+-- ====================================================================
+-- Wsteczna kompatybilność i szybkie aliasy: :Ss, :Sr, :Sl
+-- ====================================================================
+
+-- :Ss [nazwa] -> Zapis sesji
+vim.api.nvim_create_user_command("Ss", function(cmd_opts)
+	local name = cmd_opts.fargs[1] or SM.current_session or get_auto_session_name()
+	SM.save(name)
+	SM.save_small_marks(name)
+end, { nargs = "?", desc = "Zapisz bieżącą sesję" })
+
+-- :Sr <nazwa> -> Przywrócenie sesji
+vim.api.nvim_create_user_command("Sr", function(cmd_opts)
+	if #cmd_opts.fargs == 0 then
+		vim.notify("Podaj nazwę sesji: :Sr <nazwa>", vim.log.levels.WARN)
+		return
+	end
+	local session = find_session_by_name(cmd_opts.fargs[1])
+	if session then
+		SM.restore(session)
+	else
+		SM.restore(cmd_opts.fargs[1])
+	end
+end, {
+	nargs = 1,
+	desc = "Przywróć sesję",
+	complete = function()
+		local names = {}
+		for _, s in ipairs(SM.get_all_sessions()) do
+			table.insert(names, s.name)
+		end
+		return names
+	end,
+})
+
+-- :Sl -> Otwórz listę w Telescope
+vim.api.nvim_create_user_command("Sl", function()
+	require("session_manager.telescopeviewer").sessions()
+end, { desc = "Otwórz listę sesji w Telescope" })
