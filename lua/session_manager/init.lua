@@ -1,5 +1,5 @@
 -- Session Manager init.lua
--- 
+--
 --
 -- *del*
 --new entry
@@ -21,16 +21,15 @@ local default_opts = {
 }
 -- Base directory dla sesji (Twój kod)
 M.options = {
-    base_dir = vim.fs.normalize(vim.fn.stdpath("data") .. "/sessions"),
+	base_dir = vim.fs.normalize(vim.fn.stdpath("data") .. "/sessions"),
 }
 -- Helper function: Checks and creates the directory, returns the session path
 local function get_session_path(name)
-
-  -- Sprawdź czy 'name' to tablica (obiekt sesji), jeśli tak, wyciągnij pole 'filename' lub 'dir'
-    if type(name) == "table" then
-        -- W zależności od wersji wtyczki, nazwa może być w name.filename lub name.dir
-        name = name.filename or name.dir or tostring(name)
-    end
+	-- Sprawdź czy 'name' to tablica (obiekt sesji), jeśli tak, wyciągnij pole 'filename' lub 'dir'
+	if type(name) == "table" then
+		-- W zależności od wersji wty
+		name = name.filename or name.dir or tostring(name)
+	end
 	-- Save version uses only the base directory
 	local session_dir = M.options.base_dir
 	-- Ensure the base path exists ('p' flag creates parent directories if needed)
@@ -42,61 +41,67 @@ end
 
 -- Folder na small marks w ramach base_dir
 local marks_dir = M.options.base_dir .. "/marks"
-vim.fn.mkdir(marks_dir, "p")  -- upewnij się, że istnieje
+vim.fn.mkdir(marks_dir, "p") -- upewnij się, że istnieje
 
 -- Helper: pełna ścieżka pliku small marks dla sessji
 local function get_marks_file(session_name)
-    return get_session_path(session_name) .. ".marks.lua"
+	return get_session_path(session_name) .. ".marks.lua"
 end
 
 ---
 -- Zapisuje małe markery (a-z) jako Lua table dla aktualnego bufora
 ---
 function M.save_small_marks(session_name)
-    assert(session_name, "session_name required")
+	assert(session_name, "session_name required")
 
-    local file = get_marks_file(session_name)
-    local ok, data = pcall(dofile, file)
-    if not ok or type(data) ~= "table" then
-        data = {}
-    end
+	local file = get_marks_file(session_name)
+	local ok, data = pcall(dofile, file)
+	if not ok or type(data) ~= "table" then
+		data = {}
+	end
 
-    local buf = vim.api.nvim_buf_get_name(0)
-    if buf == "" then return end
+	local buf = vim.api.nvim_buf_get_name(0)
+	if buf == "" then
+		return
+	end
 
-    local marks = {}
-    for c = string.byte("a"), string.byte("z") do
-        local m = string.char(c)
-        local pos = vim.api.nvim_buf_get_mark(0, m)
-        if pos[1] ~= 0 then
-            marks[m] = pos
-        end
-    end
+	local marks = {}
+	for c = string.byte("a"), string.byte("z") do
+		local m = string.char(c)
+		local pos = vim.api.nvim_buf_get_mark(0, m)
+		if pos[1] ~= 0 then
+			marks[m] = pos
+		end
+	end
 
-    data[buf] = marks
+	data[buf] = marks
 
-    local f = io.open(file, "w")
-    f:write("return " .. vim.inspect(data))
-    f:close()
+	local f = io.open(file, "w")
+	f:write("return " .. vim.inspect(data))
+	f:close()
 end
 
 ---
 -- Wczytuje małe markery dla aktualnego bufora
 ---
 function M.restore_small_marks(session_name)
-    assert(session_name, "session_name required")
+	assert(session_name, "session_name required")
 
-    local file = get_marks_file(session_name)
-    local ok, data = pcall(dofile, file)
-    if not ok or type(data) ~= "table" then return end
+	local file = get_marks_file(session_name)
+	local ok, data = pcall(dofile, file)
+	if not ok or type(data) ~= "table" then
+		return
+	end
 
-    local buf = vim.api.nvim_buf_get_name(0)
-    local marks = data[buf]
-    if not marks then return end
+	local buf = vim.api.nvim_buf_get_name(0)
+	local marks = data[buf]
+	if not marks then
+		return
+	end
 
-    for k,v in pairs(marks) do
-        vim.api.nvim_buf_set_mark(0, k, v[1], v[2], {})
-    end
+	for k, v in pairs(marks) do
+		vim.api.nvim_buf_set_mark(0, k, v[1], v[2], {})
+	end
 end
 
 -- Zwraca sesje z persisted w formacie kompatybilnym z twoim kodem
@@ -246,34 +251,36 @@ local function save_modified_buffers()
 	end
 	-- 2. Ask the user what to do
 	-- 1=Yes(save all), 2=No(discard all), 3=Abort
-	local choices = "&Yes\n&No\n&Abort"  -- FIX: \n separator, not \\
+	local choices = "&Yes\n&No\n&Abort" -- FIX: \n separator, not \\
 	local choice = vim.fn.confirm(
 		"⚠️ There are " .. #modified_buffers .. " modified buffers. Save before closing?",
 		choices,
-		1  -- FIX: default = Yes
+		1 -- FIX: default = Yes
 	)
-	if choice == 3 or choice == 0 then  -- FIX: 3=Abort, 0=Esc
+	if choice == 3 or choice == 0 then -- FIX: 3=Abort, 0=Esc
 		print("❌ Session restore aborted.")
 		return false -- Abort restore
-	elseif choice == 1 then  -- FIX: 1=Yes (było 2)
+	elseif choice == 1 then -- FIX: 1=Yes (było 2)
 		-- Choice: Save All
-		vim.cmd("silent! wall")  -- FIX: poza pętlą, wall zapisuje wszystkie
+		vim.cmd("silent! wall") -- FIX: poza pętlą, wall zapisuje wszystkie
 		print("✅ All modified buffers saved.")
 		return true
-	else  -- choice == 2 = No
+	else -- choice == 2 = No
 		-- Choice: No - iterate and confirm one by one
 		for _, buf_info in ipairs(modified_buffers) do
 			-- Switch to the buffer to show it to the user
 			vim.api.nvim_set_current_buf(buf_info.bufnr)
 			local confirm_save = vim.fn.confirm(
 				"Buffer " .. buf_info.display_name .. " is modified. Save it?",
-				"&Yes\n&No\n&Abort",  -- FIX: \n separator
+				"&Yes\n&No\n&Abort", -- FIX: \n separator
 				1
 			) -- Default is Yes
 			if confirm_save == 1 then -- Yes
 				if buf_info.fname == "" then
 					-- If 'No Name', ask user to choose a path
-					print("⚠️ Buffer has no file name. Please save it manually (e.g. :w /path/to/file) or choose No.")
+					print(
+						"⚠️ Buffer has no file name. Please save it manually (e.g. :w /path/to/file) or choose No."
+					)
 					vim.fn.input("Press ENTER to continue...")
 					return false -- Force user to save manually
 				else
@@ -302,8 +309,8 @@ function M.save(name)
 	vim.cmd("mksession! " .. session_file)
 	vim.cmd("wshada! " .. shada_file)
 
-  -- dodaje nazwe obecnej sessji
-  M.current_session = name
+	-- dodaje nazwe obecnej sessji
+	M.current_session = name
 	print("✅ Session saved to: " .. session_file)
 end
 ---
@@ -313,20 +320,20 @@ end
 -- @param name (string) The name of the session file base (e.g., 'main')
 ---
 function M.restore(name)
-  -- Ask user what to do with modified buffers BEFORE restoring session
-if not save_modified_buffers() then
-  return
-end
+	-- Ask user what to do with modified buffers BEFORE restoring session
+	if not save_modified_buffers() then
+		return
+	end
 	local base_path = get_session_path(name)
 	local session_file = base_path .. ".mks"
 	local shada_file = base_path .. ".shada"
 
 	-- 1. Check if files exist
 	if vim.fn.filereadable(session_file) == 1 and vim.fn.filereadable(shada_file) == 1 then
-	   M.current_session = name
-	  	-- Ustaw tytuł okna
-  	vim.opt.title = true
-  	vim.opt.titlestring = "Nvim: " .. tostring(name)
+		M.current_session = name
+		-- Ustaw tytuł okna
+		vim.opt.title = true
+		vim.opt.titlestring = "Nvim: " .. tostring(name)
 
 		-- Clear the current session buffers before restoring
 		-- silent! 1bdelete | only closes all but the first buffer, then leaves only the first buffer
@@ -379,55 +386,61 @@ end
 -- @return boolean, string: true on success, false and error message on failure.
 ---
 function M.rename_session(old_name, new_name)
-    assert(old_name and new_name, "old_name and new_name are required")
+	assert(old_name and new_name, "old_name and new_name are required")
 
-    local old_base_path = get_session_path(old_name)
-    local old_mks = old_base_path .. ".mks"
-    local old_shada = old_base_path .. ".shada"
-    local old_marks = get_marks_file(old_name)
+	local old_base_path = get_session_path(old_name)
+	local old_mks = old_base_path .. ".mks"
+	local old_shada = old_base_path .. ".shada"
+	local old_marks = get_marks_file(old_name)
 
-    local new_base_path = get_session_path(new_name)
-    local new_mks = new_base_path .. ".mks"
-    local new_shada = new_base_path .. ".shada"
-    local new_marks = get_marks_file(new_name)
+	local new_base_path = get_session_path(new_name)
+	local new_mks = new_base_path .. ".mks"
+	local new_shada = new_base_path .. ".shada"
+	local new_marks = get_marks_file(new_name)
 
-    -- 1. Check if old session files exist
-    if vim.fn.filereadable(old_mks) == 0 then
-        return false, "Old session '" .. old_name .. "' not found."
-    end
+	-- 1. Check if old session files exist
+	if vim.fn.filereadable(old_mks) == 0 then
+		return false, "Old session '" .. old_name .. "' not found."
+	end
 
-    -- 2. Check if new session files already exist
-    if vim.fn.filereadable(new_mks) == 1 then
-        return false, "Session '" .. new_name .. "' already exists."
-    end
+	-- 2. Check if new session files already exist
+	if vim.fn.filereadable(new_mks) == 1 then
+		return false, "Session '" .. new_name .. "' already exists."
+	end
 
-    -- 3. Perform renames
-    local success = true
-    local error_msg = ""
+	-- 3. Perform renames
+	local success = true
+	local error_msg = ""
 
-    local function try_rename(old_path, new_path)
-        if vim.fn.filereadable(old_path) == 1 then
-            local ok, err = os.rename(old_path, new_path)
-            if not ok then
-                success = false
-                error_msg = "Failed to rename " .. old_path .. " to " .. new_path .. ": " .. tostring(err)
-                return false
-            end
-        end
-        return true
-    end
+	local function try_rename(old_path, new_path)
+		if vim.fn.filereadable(old_path) == 1 then
+			local ok, err = os.rename(old_path, new_path)
+			if not ok then
+				success = false
+				error_msg = "Failed to rename " .. old_path .. " to " .. new_path .. ": " .. tostring(err)
+				return false
+			end
+		end
+		return true
+	end
 
-    if not try_rename(old_mks, new_mks) then return false, error_msg end
-    if not try_rename(old_shada, new_shada) then return false, error_msg end
-    if not try_rename(old_marks, new_marks) then return false, error_msg end
+	if not try_rename(old_mks, new_mks) then
+		return false, error_msg
+	end
+	if not try_rename(old_shada, new_shada) then
+		return false, error_msg
+	end
+	if not try_rename(old_marks, new_marks) then
+		return false, error_msg
+	end
 
-    -- 4. Update current_session if the renamed session was active
-    if M.current_session == old_name then
-        M.current_session = new_name
-        vim.opt.titlestring = "Nvim: " .. tostring(new_name)
-    end
+	-- 4. Update current_session if the renamed session was active
+	if M.current_session == old_name then
+		M.current_session = new_name
+		vim.opt.titlestring = "Nvim: " .. tostring(new_name)
+	end
 
-    return true, "Session '" .. old_name .. "' renamed to '" .. new_name .. "'."
+	return true, "Session '" .. old_name .. "' renamed to '" .. new_name .. "'."
 end
 
 ---
@@ -453,9 +466,8 @@ function M.setup(opts)
 			end
 		end
 	end
-  -- ładowanie commands
+	-- ładowanie commands
 	require("session_manager.commands")
 end
-
 
 return M
