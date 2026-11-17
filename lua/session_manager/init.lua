@@ -295,7 +295,10 @@ local function save_modified_buffers()
 				return false
 			elseif ans == 1 then
 				if b.fname == "" then
-					vim.notify("⚠️  Bufor nie ma nazwy pliku. Zapisz go ręcznie (:w <ścieżka>).", vim.log.levels.ERROR)
+					vim.notify(
+						"⚠️  Bufor nie ma nazwy pliku. Zapisz go ręcznie (:w <ścieżka>).",
+						vim.log.levels.ERROR
+					)
 					return false
 				end
 				vim.cmd("silent! write " .. utils.escape(b.fname))
@@ -393,15 +396,23 @@ function M.restore(session_or_name)
 
 		vim.notify("✅ Sesja przywrócona: " .. session_name, vim.log.levels.INFO)
 	else
-		vim.notify("❌ Nie znaleziono pliku sesji: " .. tostring(session_file or session_or_name), vim.log.levels.ERROR)
+		vim.notify(
+			"❌ Nie znaleziono pliku sesji: " .. tostring(session_file or session_or_name),
+			vim.log.levels.ERROR
+		)
 	end
 end
 
 --- Usuwa sesję i wszystkie powiązane z nią pliki (.mks, .shada, .marks.json, .marks.lua)
 --- @param session table|string
 function M.delete_session(session)
-	local path = type(session) == "table" and session.path or nil
-	local name = type(session) == "table" and session.name or session
+	if type(session) == "table" and session.is_persisted then
+		if vim.fn.filereadable(session.path) == 1 then
+			os.remove(session.path)
+		end
+		vim.notify("✅ Usunięto sesję persisted: " .. tostring(session.name), vim.log.levels.INFO)
+		return
+	end
 
 	if not path then
 		local base = get_session_base_path(name)

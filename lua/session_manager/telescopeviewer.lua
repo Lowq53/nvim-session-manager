@@ -135,11 +135,8 @@ function M.sessions(opts)
 				if not entry or not entry.data then
 					return
 				end
-				local confirm = vim.fn.confirm(
-					string.format("Czy na pewno usunąć sesję '%s'?", entry.value),
-					"&Tak\n&Nie",
-					2
-				)
+				local confirm =
+					vim.fn.confirm(string.format("Czy na pewno usunąć sesję '%s'?", entry.value), "&Tak\n&Nie", 2)
 				if confirm == 1 then
 					help_float_close()
 					SM.delete_session(entry.data)
@@ -153,6 +150,10 @@ function M.sessions(opts)
 			local function save_session()
 				local entry = action_state.get_selected_entry()
 				if not entry then
+					return
+				end
+				if entry.data and entry.data.is_persisted then
+					vim.notify("⚠️ Sesja persisted.nvim - tylko odczyt/wczytanie.", vim.log.levels.WARN)
 					return
 				end
 				local confirm = vim.fn.confirm(
