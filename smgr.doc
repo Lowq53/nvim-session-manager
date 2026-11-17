@@ -1,6 +1,37 @@
 # Lista przeprowadzonych zmian w nvim-session-manager (Dla gałęzi main_for_linux)
 
-Dokument podsumowujący wdrożenie zaleceń i analizy z pliku: C:\code_data\all_docs\linux_smgr.md
+==============================================================================
+0. SESJA TEJ ROZMOWY I JAK JĄ PRZYWRÓCIĆ / WZNOWIĆ
+==============================================================================
+- Identyfikator rozmowy (Conversation ID): a05cec34-0983-4535-8436-ab42bd5bb282
+- Bezpośredni link w interfejsie Antigravity:
+  [Wznów tę rozmowę](conversation://a05cec34-0983-4535-8436-ab42bd5bb282)
+
+- Przywrócenie / wznowienie rozmowy przez Antigravity CLI (agy):
+  1) Wznowienie po konkretnym ID rozmowy:
+     agy --conversation a05cec34-0983-4535-8436-ab42bd5bb282
+
+  2) Wznowienie ostatniej rozmowy:
+     agy -c
+     (lub: agy --continue)
+
+- Lokalizacja pełnego transkryptu i logów tej sesji:
+  C:\Users\LOWq_53\.gemini\antigravity-cli\brain\a05cec34-0983-4535-8436-ab42bd5bb282\.system_generated\logs\transcript.jsonl
+
+- Przywrócenie gałęzi w Git i repozytorium:
+  cd C:\dev\nvimdev\nvim-session-manager
+  git checkout main_for_linux
+
+- Weryfikacja działania w Neovim:
+  nvim
+  :lua require('session_manager').setup()
+  :Smgr list
+  (lub szybkie aliasy: :Ss, :Sr, :Sl)
+
+==============================================================================
+DOKUMENTACJA ZMIAN
+==============================================================================
+Dokument bazowy analizy: C:\code_data\all_docs\linux_smgr.md
 Gałąź robocza: main_for_linux
 
 ==============================================================================
