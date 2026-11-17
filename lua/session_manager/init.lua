@@ -18,6 +18,8 @@ local default_opts = {
 M.options = vim.deepcopy(default_opts)
 
 --- Zwraca ścieżkę bazową dla danej sesji (bez rozszerzenia)
+--- Jeśli sesja już istnieje w którymś z katalogów w M.search_dirs (np. w extra_dirs),
+--- funkcja zwraca jej oryginalną lokalizację, zapobiegając powstawaniu duplikatów.
 --- @param name string|table
 --- @return string
 local function get_session_base_path(name)
@@ -25,19 +27,38 @@ local function get_session_base_path(name)
 		name = name.filename or name.name or tostring(name)
 	end
 
+	local clean_name = tostring(name)
+
+	-- Sprawdź czy sesja już istnieje w znanych katalogach wyszukiwania
+	if M.search_dirs then
+		for _, dir in ipairs(M.search_dirs) do
+			local test_file = utils.join_path(dir, clean_name .. ".mks")
+			if vim.fn.filereadable(test_file) == 1 then
+				return utils.join_path(dir, clean_name)
+			end
+		end
+	end
+
+	-- W przeciwnym razie użyj katalogu bazowego (base_dir)
 	local session_dir = utils.normalize_path(M.options.base_dir)
 	vim.fn.mkdir(session_dir, "p")
 
-	return utils.join_path(session_dir, tostring(name))
+	return utils.join_path(session_dir, clean_name)
 end
 
 --- Zwraca pełną ścieżkę do pliku z małymi markerami dla danej sesji (.marks.json)
+--- Zapisuje markery w podfolderze 'marks' w katalogu, w którym znajduje się sesja.
 --- @param session_name string
 --- @return string
 local function get_marks_file(session_name)
-	local marks_dir = utils.join_path(M.options.base_dir, "marks")
+	local base_path = get_session_base_path(session_name)
+	local dir = vim.fn.fnamemodify(base_path, ":h")
+	local name = vim.fn.fnamemodify(base_path, ":t")
+
+	local marks_dir = utils.join_path(dir, "marks")
 	vim.fn.mkdir(marks_dir, "p")
-	return utils.join_path(marks_dir, session_name .. ".marks.json")
+
+	return utils.join_path(marks_dir, name .. ".marks.json")
 end
 
 --- Zwraca ścieżkę do starszego pliku markerów (.marks.lua) dla zachowania kompatybilności
@@ -90,6 +111,12 @@ function M.restore_small_marks(session_name)
 
 	local file = get_marks_file(session_name)
 	local all_marks = utils.read_json_file(file)
+
+	-- Sprawdź również alternatywną lokalizację w base_dir/marks jeśli sesja była w extra_dirs
+	if not all_marks then
+		local fallback_marks_file = utils.join_path(M.options.base_dir, "marks", session_name .. ".marks.json")
+		all_marks = utils.read_json_file(fallback_marks_file)
+	end
 
 	-- Kompatybilność wsteczna ze starym formatem .marks.lua
 	if not all_marks then
@@ -161,7 +188,7 @@ local function get_persisted_sessions()
 	return sessions
 end
 
---- Pobiera wszystkie dostępne sesje ze wszystkich skonfigurowanych katalogów
+--- Pobiera wszystkie dostępne sesje ze wszystkich skonfigurowanych katalogów (base_dir + extra_dirs)
 --- @return table
 function M.get_all_sessions()
 	local session_names = {}
@@ -303,7 +330,7 @@ function M.save(name)
 	vim.notify("✅ Sesja zapisana: " .. name, vim.log.levels.INFO)
 end
 
---- Przywraca wskazaną sesję
+--- Przywraca wskazaną sesję (ze standardowego katalogu lub z extra_dirs)
 --- @param session_or_name string|table
 function M.restore(session_or_name)
 	if not save_modified_buffers() then
@@ -326,7 +353,7 @@ function M.restore(session_or_name)
 		session_file = base_path .. ".mks"
 		shada_file = base_path .. ".shada"
 
-		-- Jeśli plik nie istnieje bezpośrednio w base_dir, sprawdź czy jest w innych katalogach sesji
+		-- Jeśli plik nie istnieje bezpośrednio, sprawdź czy jest w innych katalogach sesji
 		if vim.fn.filereadable(session_file) == 0 then
 			for _, s in ipairs(M.get_all_sessions()) do
 				if s.name == session_name then
@@ -415,14 +442,16 @@ function M.rename_session(old_name, new_name)
 	assert(old_name and new_name, "Wymagana jest stara i nowa nazwa!")
 
 	local old_base = get_session_base_path(old_name)
-	local new_base = get_session_base_path(new_name)
-
 	local old_mks = old_base .. ".mks"
-	local new_mks = new_base .. ".mks"
 
 	if vim.fn.filereadable(old_mks) == 0 then
 		return false, "Sesja '" .. old_name .. "' nie istnieje."
 	end
+
+	-- Nowa sesja powstanie w tym samym katalogu co stara sesja
+	local dir = vim.fn.fnamemodify(old_base, ":h")
+	local new_base = utils.join_path(dir, new_name)
+	local new_mks = new_base .. ".mks"
 
 	if vim.fn.filereadable(new_mks) == 1 then
 		return false, "Sesja '" .. new_name .. "' już istnieje."
@@ -477,12 +506,25 @@ function M.setup(opts)
 	-- Przygotowanie katalogu bazowego
 	vim.fn.mkdir(M.options.base_dir, "p")
 
-	-- Przygotowanie katalogów wyszukiwania
+	-- Przygotowanie katalogów wyszukiwania (unikalne)
+	local seen = { [M.options.base_dir] = true }
 	M.search_dirs = { M.options.base_dir }
+
 	if M.options.extra_dirs and type(M.options.extra_dirs) == "table" then
-		for _, dir in ipairs(M.options.extra_dirs) do
-			local norm = utils.normalize_path(dir)
-			if vim.fn.isdirectory(norm) == 1 then
+		for _, raw_dir in ipairs(M.options.extra_dirs) do
+			local norm = utils.normalize_path(raw_dir)
+
+			-- Sprawdź alternatywną ścieżkę jeśli zaczyna się od "share/" i nie istnieje lokalnie
+			if norm ~= "" and vim.fn.isdirectory(norm) == 0 and norm:match("^share/") then
+				local candidate = utils.join_path(vim.fn.expand("~/.local"), norm)
+				if vim.fn.isdirectory(candidate) == 1 then
+					norm = candidate
+				end
+			end
+
+			-- Dodaj jeśli katalog istnieje na dysku
+			if norm ~= "" and vim.fn.isdirectory(norm) == 1 and not seen[norm] then
+				seen[norm] = true
 				table.insert(M.search_dirs, norm)
 			end
 		end
