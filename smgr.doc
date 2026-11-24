@@ -1,0 +1,127 @@
+# Lista przeprowadzonych zmian w nvim-session-manager (Dla gałęzi main_for_linux)
+
+==============================================================================
+0. SESJA TEJ ROZMOWY I JAK JĄ PRZYWRÓCIĆ / WZNOWIĆ
+==============================================================================
+- Identyfikator rozmowy (Conversation ID): a05cec34-0983-4535-8436-ab42bd5bb282
+- Bezpośredni link w interfejsie Antigravity:
+  [Wznów tę rozmowę](conversation://a05cec34-0983-4535-8436-ab42bd5bb282)
+
+- Przywrócenie / wznowienie rozmowy przez Antigravity CLI (agy):
+  1) Wznowienie po konkretnym ID rozmowy:
+     agy --conversation a05cec34-0983-4535-8436-ab42bd5bb282
+
+  2) Wznowienie ostatniej rozmowy:
+     agy -c
+     (lub: agy --continue)
+
+- Lokalizacja pełnego transkryptu i logów tej sesji:
+  C:\Users\LOWq_53\.gemini\antigravity-cli\brain\a05cec34-0983-4535-8436-ab42bd5bb282\.system_generated\logs\transcript.jsonl
+
+- Przywrócenie gałęzi w Git i repozytorium:
+  cd C:\dev\nvimdev\nvim-session-manager
+  git checkout main_for_linux
+
+- Weryfikacja działania w Neovim:
+  nvim
+  :lua require('session_manager').setup()
+  :Smgr list
+  (lub szybkie aliasy: :Ss, :Sr, :Sl)
+
+==============================================================================
+DOKUMENTACJA ZMIAN
+==============================================================================
+Dokument bazowy analizy: C:\code_data\all_docs\linux_smgr.md
+Gałąź robocza: main_for_linux
+
+==============================================================================
+1. GAŁĄŹ GIT I PORZĄDKI W REPOZYTORIUM
+==============================================================================
+- Utworzono nową gałąź `main_for_linux` dedykowaną dla środowisk Linux, WSL oraz macOS z zachowaniem pełnej kompatybilności z Windows.
+- Usunięto pusty, niepożądany katalog `lua/session_manager/.exe`.
+- Przeniesiono pliki notatek deweloperskich (`lua/session_manager/analize.doc` oraz `lua/session_manager/development_plan.md`) do dedykowanego katalogu `docs/` w korzeniu projektu (`docs/analize.doc`, `docs/development_plan.md`).
+- Zaimportowano i zaktualizowano dokumentację Vimdoc z gałęzi `feature-L` do `doc/session-manager.txt` oraz wygenerowano aktualne tagi pomocy w `doc/tags`.
+- Zaktualizowano plik `.gitignore` o ignorowanie plików tymczasowych, `.exe/`, `*.tmp` i obiektów kompilacji Lua.
+
+==============================================================================
+2. NOWY MODUŁ NARZĘDZIOWY (lua/session_manager/utils.lua)
+==============================================================================
+- Zaimplementowano detekcję systemu operacyjnego przy użyciu natywnego API Neovima:
+  * `M.is_win` (Windows)
+  * `M.is_mac` (macOS)
+  * `M.is_wsl` (środowisko WSL)
+  * `M.is_linux` (natywny Linux)
+- Zaimplementowano funkcję `M.normalize_path(path)`:
+  * Zamienia ukośniki odwrotne `\` na uniwersalne slashe `/`.
+  * Redukuje podwójne ukośniki.
+  * Rozwija ścieżki domowe z tyldą `~` (`vim.fn.expand`).
+  * Usuwa zbędne ukośniki końcowe.
+- Zaimplementowano funkcję `M.join_path(...)` do bezpiecznego łączenia segmentów ścieżek na każdym systemie.
+- Zaimplementowano funkcję `M.escape(path)` korzystającą z `vim.fn.fnameescape()`, zapobiegającą błędom Neovima przy spacjach lub znakach specjalnych w nazwach użytkowników i katalogów.
+- Zaimplementowano bezpieczne sprawdzanie i zamykanie okien pływających (`has_floating_windows()`, `close_all_floating_windows()`), co zapobiega błędom przy przełączaniu i przywracaniu sesji.
+- Zaimplementowano bezpieczny zapis i odczyt danych w formacie JSON (`write_json_file()`, `read_json_file()`):
+  * Wykorzystuje szybki, wbudowany parser `vim.json`.
+  * Na systemach uniksowych (Linux/macOS) automatycznie nakłada restrykcyjne uprawnienia `0600` (`chmod 384`), chroniąc wrażliwe dane sesji przed innymi użytkownikami.
+
+==============================================================================
+3. PRZEBUDOWA RDZENIA PLUGINU (lua/session_manager/init.lua)
+==============================================================================
+- Usunięto błąd zabójczy dla Linuksa: zamianę slashy na backslashe `win_dir = dir:gsub("/", "\\\\")` i `\\*.mks`, która uniemożliwiała znalezienie jakiejkolwiek sesji na systemach linuksowych. Zastąpiono uniwersalnym mechanizmem glob `join_path(dir, "*.mks")`.
+- Usunięto stałe ścieżki dyskowe Windows (np. `C:\code_data\...`) z domyślnej konfiguracji. Zastąpiono je dynamicznymi ścieżkami bazującymi na standardzie XDG: `vim.fn.stdpath("data") .. "/sessions"`.
+- Usunięto operacje I/O z poziomu ładowania modułu (top-level `mkdir` został usunięty; foldery tworzone są leniwie przy zapisie sesji lub podczas wywołania `setup()`).
+- Przebudowano zapis małych markerów buforowych (`save_small_marks`):
+  * Zamiast zapisywać markery tylko dla jednego aktywnego bufora (`0`), funkcja iteruje po wszystkich załadowanych buforach projektu (`vim.api.nvim_list_bufs()`).
+  * Markery zapisywane są w czystym formacie JSON w `marks/<sesja>.marks.json`.
+- Przebudowano odczyt małych markerów (`restore_small_marks`):
+  * Przywraca markery dla wszystkich otwartych buforów projektu.
+  * Zapewniono pełną kompatybilność wsteczną – w razie braku pliku `.marks.json` automatycznie próbuje odczytać stary format `.marks.lua`.
+- Poprawiono czyszczenie buforów przed wczytaniem nowej sesji:
+  * Zamiast wadliwego `silent! 1bdelete | only` (który usuwał tylko bufor 1), wprowadzono `silent! %bdelete!` wraz z uprzednim zamknięciem okien pływających.
+- Dodano inteligentne okno dialogowe przed zamknięciem/przywróceniem sesji, pytające użytkownika o niezapisane bufory (Zapisz wszystko, Pytaj o każdy, Odrzuć zmiany, Anuluj).
+- Usprawniono integrację z `persisted.nvim`:
+  * Funkcja `restore()` potrafi teraz obsłużyć bezpośrednio obiekty sesji oraz pliki `.vim` z zewnętrznych katalogów.
+- Zapewniono kompletne usuwanie sesji w `delete_session`:
+  * Usuwa pliki `.mks`, `.shada`, `.marks.json` oraz ewentualne pozostałości `.marks.lua`.
+- Zapewniono kompletną zmianę nazwy sesji w `rename_session`:
+  * Zmienia nazwy wszystkich powiązanych plików (`.mks`, `.shada`, `.marks.json`, `.marks.lua`) z obsługą błędów i weryfikacją kolizji.
+- Dodano automatyczną aktualizację tytułu okna Neovima (`titlestring`) na `Nvim: <nazwa_sesji>` przy zapisie, odczycie i zmianie nazwy.
+
+==============================================================================
+4. UJEDNOLICENIE KOMEND (lua/session_manager/commands.lua)
+==============================================================================
+- Zaimplementowano i ustandaryzowano pełną komendę `:Smgr`:
+  * `:Smgr save [nazwa]` (lub `:Smgr s`) – zapis sesji i markerów.
+  * `:Smgr load <nazwa>` (lub `:Smgr l`, `:Smgr restore`, `:Smgr r`) – odczyt sesji, shada i markerów.
+  * `:Smgr delete <nazwa>` (lub `:Smgr d`, `:Smgr del`) – usunięcie sesji i powiązanych plików.
+  * `:Smgr rename <stara> <nowa>` (lub `:Smgr rn`) – zmiana nazwy sesji.
+  * `:Smgr current` (lub `:Smgr c`) – podgląd aktywnej sesji.
+  * `:Smgr list` (lub `:Smgr ls`) – otwarcie okna wyboru Telescope.
+- Dodano szybkie aliasy komend:
+  * `:Ss [nazwa]` – szybki zapis.
+  * `:Sr <nazwa>` – szybki odczyt.
+  * `:Sl` – szybkie otwarcie pickera Telescope.
+- Wprowadzono inteligentne autouzupełnianie (`complete`) pod klawiszem Tab dla podkomend oraz dla nazw istniejących sesji.
+
+==============================================================================
+5. DOSZLIFOWANIE TELESCOPE (lua/session_manager/telescopeviewer.lua)
+==============================================================================
+- Skonfigurowano pełen zestaw skrótów klawiszowych w oknie wyboru sesji:
+  * `<CR>` – wczytanie wybranej sesji.
+  * `<C-s>` – nadpisanie zaznaczonej sesji z oknem potwierdzenia.
+  * `<C-S-s>` – zapis jako nowa sesja z walidacją dozwolonych znaków oraz sprawdzaniem duplikatów.
+  * `<C-d>` – usunięcie zaznaczonej sesji z oknem potwierdzenia.
+  * `<C-r>` – zmiana nazwy zaznaczonej sesji.
+  * `?` – dynamiczne włączanie/wyłączanie okna pomocy.
+  * `<Esc>` / `q` / `<C-c>` – bezpieczne zamknięcie okna i pomocnika.
+- Obsłużono 3 tryby pomocy konfigurowane przez opcję `help_mode`:
+  * `"notify"` – powiadomienie przez `vim.notify`.
+  * `"float"` – estetyczne, wyśrodkowane okno pływające ze zindex = 200 i zaokrągloną ramką.
+  * `"preview"` – podgląd pomocy wbudowany bezpośrednio w panel previewera Telescope.
+- Zaimplementowano automatyczne odświeżanie pickera Telescope po wykonaniu operacji usunięcia, nadpisania, utworzenia nowej sesji lub zmiany nazwy.
+
+==============================================================================
+6. DOKUMENTACJA I PLIKI PROJEKTOWE
+==============================================================================
+- Zaktualizowano `README.md` – dodano pełny opis nowych komend, aliasów, skrótów klawiszowych, tabelę skrótów oraz przykłady konfiguracji lazy.nvim.
+- Zaktualizowano `doc/session-manager.txt` – oficjalna dokumentacja Neovim help dostępna przez `:help session-manager`.
+- Wygenerowano plik tagów pomocy `doc/tags`.

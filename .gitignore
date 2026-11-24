@@ -10,5 +10,8 @@
 *.luac
 
 # Lazy.nvim/packer cache (jeśli testujesz plugin lokalnie)
-.git/
 .nvim/
+
+# Build and temporary artifacts
+.exe/
+*.tmp
